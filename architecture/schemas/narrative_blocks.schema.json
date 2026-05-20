@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title":   "narrative_blocks",
+  "description": "DRAFT v0 — the prose blocks the Insights agent emits, consumed by the HTML splicer. Not finalised; iterating.",
+  "type":    "object",
+  "required": ["schema_version", "main_conclusions", "top_3_actions", "drivers_insight", "patterns"],
+  "additionalProperties": false,
+  "properties": {
+
+    "schema_version": {
+      "type": "string",
+      "description": "Version tag so the splicer knows how to handle future shape changes.",
+      "const": "0.1"
+    },
+
+    "main_conclusions": {
+      "type": "object",
+      "description": "Top section of the dashboard. One headline plus 4-6 bullets, leading with what's improving, ending with the single highest-leverage opportunity.",
+      "required": ["headline", "bullets"],
+      "additionalProperties": false,
+      "properties": {
+        "headline": {
+          "type": "string",
+          "description": "Short, positive-framed sentence. No numerals.",
+          "minLength": 10,
+          "maxLength": 120
+        },
+        "bullets": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "body", "tone"],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 100,
+                "description": "The bullet's bold one-liner. Lead with the finding."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 20,
+                "maxLength": 400,
+                "description": "Two to three sentences. Plain language. Numbers carry units. No comma separators in numerals. Period-aggregate comparisons forbidden."
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["good", "watch", "opportunity"],
+                "description": "Drives the bullet's color stripe on the dashboard. 'good' = green, 'watch' = amber, 'opportunity' = blue."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "top_3_actions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Three concrete actions, in priority order. The first one is the highest-leverage thing to address next.",
+      "items": {
+        "type": "object",
+        "required": ["title", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 100
+          },
+          "body": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 500,
+            "description": "What to do, why, and what to look at on the floor."
+          }
+        }
+      }
+    },
+
+    "drivers_insight": {
+      "type": "object",
+      "description": "The single diagnostic insight about what drives week-to-week variance in the loss rate.",
+      "required": ["title", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 10, "maxLength": 100 },
+        "body":  { "type": "string", "minLength": 50, "maxLength": 800 }
+      }
+    },
+
+    "patterns": {
+      "type": "object",
+      "description": "Intro paragraphs for the Patterns tab, one per section. Each leads with the BEST shift / day, then contrasts with the worst.",
+      "required": ["by_shift_intro", "by_weekday_intro", "per_shift_trend_intro"],
+      "additionalProperties": false,
+      "properties": {
+        "by_shift_intro": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 700,
+          "description": "Pattern 1 intro. Lead with the cleanest shift; contrast with the slowest. Numbers carry units."
+        },
+        "by_weekday_intro": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 700,
+          "description": "Pattern 2 intro. Lead with the cleanest weekday; contrast with the worst. Mention weekend caveat if relevant."
+        },
+        "per_shift_trend_intro": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 800,
+          "description": "Per-shift trend intro. Reports per-shift OLS slopes for the loss rate, plus the per-shift presence trend. Use the methodology's flat threshold."
+        }
+      }
+    }
+  }
+}

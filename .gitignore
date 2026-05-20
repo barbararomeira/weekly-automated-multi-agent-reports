@@ -1,0 +1,29 @@
+# --- Real customer data — never commit ---
+inputs/
+outputs/
+status/
+config/*.yaml
+!config/*.example.yaml
+
+# Real env files
+.env
+.env.*
+!.env.example
+
+# Generated dashboards (per-report HTML + fleet view)
+*.html
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
