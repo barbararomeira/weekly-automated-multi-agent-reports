@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ report_display_name }} — Weekly Report</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   Helvetica, Arial, sans-serif;
+      color: #1f2937;
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      line-height: 1.55;
+    }
+    h1 { font-size: 1.6rem; margin: 0 0 0.25rem 0; }
+    h2 { font-size: 1.2rem;  margin-top: 2.25rem; }
+    h3 { font-size: 1.0rem;  margin-top: 1.5rem; color: #374151; }
+    .meta { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .reviewer-flags {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      border-radius: 4px;
+    }
+    .reviewer-flags h2 { margin-top: 0; }
+    .warning { margin-bottom: 1rem; }
+    .warning .claim    { font-weight: 600; }
+    .warning .issue    { font-style: italic; color: #92400e; }
+    .warning .evidence { color: #6b7280; font-size: 0.9rem; }
+    .warning .override { color: #6b7280; font-size: 0.9rem; margin-top: 0.4rem; }
+    .kpi-widgets { display: flex; gap: 1rem; margin: 1.5rem 0 2.5rem; }
+    .widget {
+      flex: 0 1 300px;
+      padding: 1.25rem 1.5rem;
+      border: 1px solid #e5e7eb;
+      border-left-width: 6px;
+      border-radius: 6px;
+    }
+    .widget .label  { color: #6b7280; font-size: 0.8rem; text-transform: uppercase;
+                      letter-spacing: 0.05em; }
+    .widget .value  { font-size: 2.1rem; font-weight: 700; margin-top: 0.25rem;
+                      line-height: 1.1; }
+    .widget .value .unit { font-size: 1rem; color: #6b7280; font-weight: 400; }
+    .widget .trend  { color: #6b7280; font-size: 0.9rem; margin-top: 0.5rem; }
+    .main-conclusions ul { padding-left: 1.25rem; }
+    .main-conclusions li { margin-bottom: 1rem; }
+    .main-conclusions p  { margin: 0.25rem 0 0 0; }
+    .action {
+      border-left: 3px solid #3b82f6;
+      padding-left: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .action p { margin: 0.25rem 0 0 0; }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e5e7eb;
+      color: #6b7280;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>{{ report_display_name }}</h1>
+    <div class="meta">Week ending {{ week_end }} · {{ customer }}</div>
+  </header>
+
+  {% if reviewer_flags %}
+  <section class="reviewer-flags">
+    <h2>⚠ Reviewer flags</h2>
+    {% for w in reviewer_flags %}
+      <div class="warning">
+        <div class="claim">{{ w.claim }}</div>
+        <div class="issue">{{ w.issue }}</div>
+        <div class="evidence">{{ w.evidence }}</div>
+        {% if w.override and w.override.overridden %}
+          <div class="override">Overridden: {{ w.override.justification }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section class="kpi-widgets">
+    <div class="widget" style="border-left-color: {{ headline_color }};">
+      <div class="label">Latest complete week</div>
+      <div class="value">
+        <span data-test-id="headline-rate-value">{{ headline_value }}</span>
+        <span class="unit" data-test-id="headline-rate-unit">{{ headline_unit }}</span>
+      </div>
+      <div class="trend">
+        <span data-test-id="headline-trend-direction">{{ trend_direction }}</span>
+        ({{ trend_slope }} {{ trend_slope_unit }})
+      </div>
+    </div>
+  </section>
+
+  <section class="main-conclusions">
+    <h2>{{ main_conclusions.headline }}</h2>
+    <ul>
+      {% for bullet in main_conclusions.bullets %}
+      <li>
+        <strong>{{ bullet.title }}</strong>
+        <p>{{ bullet.body }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    {{ chart_weekly_trend | safe }}
+  </section>
+
+  <section class="top-3-actions">
+    <h2>Top 3 actions</h2>
+    {% for action in top_3_actions %}
+    <div class="action">
+      <strong>{{ action.title }}</strong>
+      <p>{{ action.body }}</p>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section>
+    <h2>{{ drivers_insight.title }}</h2>
+    <p>{{ drivers_insight.body }}</p>
+  </section>
+
+  <section>
+    <h2>Patterns</h2>
+
+    <h3>By shift</h3>
+    <p>{{ patterns.by_shift_intro }}</p>
+    {{ chart_by_shift | safe }}
+
+    <h3>By weekday</h3>
+    <p>{{ patterns.by_weekday_intro }}</p>
+    {{ chart_by_weekday | safe }}
+
+    <h3>Per-shift trend</h3>
+    <p>{{ patterns.per_shift_trend_intro }}</p>
+    {{ chart_per_shift_trend | safe }}
+  </section>
+
+  <footer>
+    Generated {{ generated_at }} · report_id: {{ report_id }}
+  </footer>
+</body>
+</html>

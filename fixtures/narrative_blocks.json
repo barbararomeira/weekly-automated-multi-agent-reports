@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "main_conclusions": {
+    "headline": "Loss rate trending down across the line; 2nd shift needs attention.",
+    "bullets": [
+      {
+        "title": "Loss rate improving overall",
+        "body": "Across the eight-week window, the per-week loss rate moved from 9.01 bags/h down to 7.77 bags/h. The OLS slope on the per-week rate is around -0.23 bags/h/wk, indicating steady improvement."
+      },
+      {
+        "title": "1st shift leading the improvement",
+        "body": "1st shift's loss rate dropped from 8.5 bags/h to 5.72 bags/h across the window — the largest single-shift gain. The rate has been below 7.7 bags/h for the last three weeks."
+      },
+      {
+        "title": "3rd shift improving steadily",
+        "body": "3rd shift moved from 10.05 bags/h down to 8.09 bags/h. Improvement is consistent week over week, though the baseline remains the highest of the three shifts."
+      },
+      {
+        "title": "2nd shift regression worth flagging",
+        "body": "2nd shift's loss rate sits at 9.45 bags/h in the latest complete week, up from a mid-period dip around 7.34 bags/h. The most recent two weeks (9.49 and 9.45 bags/h) sit visibly above the trough — worth investigating before the gap widens."
+      },
+      {
+        "title": "Largest opportunity: bring 2nd shift in line with 1st",
+        "body": "1st shift is now operating at 5.72 bags/h; 2nd shift at 9.45 bags/h. If 2nd shift can adopt the operating practices driving 1st shift's gains, the remaining gap is the highest-leverage improvement available."
+      }
+    ]
+  },
+  "top_3_actions": [
+    {
+      "title": "Audit 2nd shift cycle starts versus 1st shift",
+      "body": "Compare 1st and 2nd shift operating procedures over the last three weeks. The 1st shift improved from 8.5 to 5.72 bags/h; isolate which practices drove the gap and pilot them on 2nd shift next week."
+    },
+    {
+      "title": "Investigate the 2nd-shift jump in the last two weeks",
+      "body": "Loss rate on 2nd shift bounced from 7.34 to 9.45 bags/h over the most recent two weeks. Walk the shift to identify what changed — operator rotation, material, equipment-related, or scheduling — and document before it normalises into the baseline."
+    },
+    {
+      "title": "Continue tracking the 3rd-shift trajectory",
+      "body": "3rd shift is steadily improving without intervention; no new action needed this week. Track the next two weeks to confirm the slope holds."
+    }
+  ],
+  "drivers_insight": {
+    "title": "Variance is driven by between-shift gaps, not within-week noise",
+    "body": "The single largest source of variance in this period's loss rate is the gap between shifts, not week-to-week wobble. 1st shift averages 7.12 bags/h across the window; 3rd shift averages 9.77 — that 2.65 bags/h gap is wider than any week-over-week swing for a single shift. Closing the inter-shift gap is the highest-leverage intervention; reducing week-to-week wobble within a single shift is secondary."
+  },
+  "patterns": {
+    "by_shift_intro": "Across all eight weeks, 1st shift is the cleanest at 7.12 bags/h. 2nd shift sits in the middle at 8.92 bags/h. 3rd shift carries the highest loss rate at 9.77 bags/h. The shift-to-shift gap (2.65 bags/h between best and worst) is the largest stable signal in the data.",
+    "by_weekday_intro": "Loss rates by weekday are remarkably even, ranging from 8.19 bags/h on Friday to 8.89 bags/h on Sunday. The variance across weekdays (0.7 bags/h) is much smaller than across shifts, suggesting there is no strong weekday effect — operating conditions are similar regardless of which day the cycles ran.",
+    "per_shift_trend_intro": "Per-shift OLS slopes tell different stories. 1st shift is the strongest improver, 3rd shift is steadily improving, and 2nd shift's slope is approximately flat with the last two weeks pushing the rate noticeably upward. The 2nd-shift line on the chart shows the regression most clearly."
+  }
+}
