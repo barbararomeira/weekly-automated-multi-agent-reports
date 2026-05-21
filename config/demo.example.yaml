@@ -1,0 +1,16 @@
+# Demo config — customer-agnostic. Real reports use their own
+# `config/<report_id>.yaml` which is git-ignored (Decision 27).
+
+report_id: demo
+customer: Synthetic customer
+line_name: Synthetic line
+report_display_name: Demo line — synthetic data
+
+# Standard Operating Procedure target — the cycle target in seconds.
+# Real reports would use the actual SOP for their station.
+sop_seconds: 138
+
+# Minimum cycles per shift-date to be included in aggregates (Decision 5).
+# The pipeline applies the same threshold; this is documented here for
+# the agents to read.
+exclusion_threshold_cycles: 20
