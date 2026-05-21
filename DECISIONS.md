@@ -706,3 +706,81 @@ impact — deletion is a small change. Reviewing this is an explicit
 post-POC task.
 
 ---
+
+## 24. Orchestrator architecture (shape, retries, failure handling)
+
+`run_weekly.py` is the entrypoint the Monday cron triggers. Three coupled
+sub-decisions locked together.
+
+### a. Shape: direct Python imports
+
+Each pipeline step is a Python module exposing a top-level function
+(e.g., `compute_kpis(kpi_dir, config_path)`). `run_weekly.py` imports them
+and calls them in order in a single process. Data passes between steps in
+memory (DataFrames, dicts) — *and* the steps still write their canonical
+outputs to disk (CSVs, JSONs) per the existing data contracts.
+
+Each step module *also* has an `if __name__ == "__main__":` block so it can
+be run standalone for debugging or single-step re-runs
+(`python scripts/insights_agent.py --kpi-dir outputs/ --config ...`).
+
+**Considered**: shell-out via `subprocess.run` per step. Better isolation
+and trivially re-runnable on its own — but cold-start overhead each week,
+more CLI plumbing for API keys and model config, and tracebacks lose the
+call-chain context.
+
+**Why**: keeps the runtime simple — one process, function calls, full
+Python tracebacks. The `__main__` blocks give the easy-debugging story of
+subprocess without the cold-start cost. Configuration (API keys, model
+choice, retry knobs) is plain function args, not env-var plumbing.
+
+### b. Retry policy: rely on SDK built-ins
+
+The Anthropic Python SDK ships with retry on 429 / 5xx / timeouts using
+exponential backoff. Configure `max_retries=3` and trust it. No
+orchestrator-level wrap-around retry layer.
+
+Schema-validation retries on agent output are a separate one-shot retry
+handled inside each agent's wrapper — already documented in
+[insights_agent.md](./architecture/agents/insights_agent.md) and
+[verifier_agent.md](./architecture/agents/verifier_agent.md).
+
+**Considered**: custom retry layer wrapping the SDK for finer control over
+specific error types.
+
+**Why**: built-in SDK retries are tested in the wild against the exact
+transient-error patterns we'd want to handle. Re-implementing buys nothing
+for the POC and just adds maintenance.
+
+### c. Failure handling: halt cleanly + write `status: fail`
+
+Any step that fails — LLM retries exhausted, audit invariant violated,
+splicer post-render mismatch, unexpected exception — halts the pipeline.
+The orchestrator writes a synthetic warning into `verifier_report.json`
+with `category: "other"` (same shape as a verifier-side hard warning),
+copies it into `status.json`, sets `status: fail`, and exits.
+
+The Fleet View card surfaces the failure with the cause inline; the
+RUNBOOK scenarios apply identically regardless of cause.
+
+**Considered**: let the orchestrator just crash (exception propagates,
+nothing written). Simpler code, but the reviewer wouldn't see the failure
+until they checked the cron logs.
+
+**Why**: a single failure-reporting channel means one set of Fleet View
+behaviours covers every failure mode. The operator never has to check
+cron logs to know something broke.
+
+### Implications
+
+- **status.schema.json**: the four continuity fields (`headline`, `trend`,
+  `main_conclusions`, `top_3_actions`) and `dashboard_path` are optional —
+  they're only present when the run got far enough to produce them. The
+  required set narrows to the fields every run can produce regardless of
+  outcome.
+- **Insights agent**: must be defensive about the continuity payload. If
+  the prior week's status is `fail` and the continuity fields are absent,
+  the agent treats it as *"no prior status available"* and writes a fresh
+  start that week.
+
+---

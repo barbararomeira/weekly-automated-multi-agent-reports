@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title":   "status",
-  "description": "v1.0 — per-report status JSON written at the end of every pipeline run. Two consumers: (1) the Fleet View builder reads every status file and renders one card per report on the index page; (2) the Insights agent reads its own previous run's status for cross-week continuity (see DECISIONS.md entries 8 and 22). The file is self-contained so the Fleet View card needs only this one file per report to render. Schema locked 2026-05-21.",
+  "description": "v1.0 — per-report status JSON written at the end of every pipeline run (including failed runs). Two consumers: (1) the Fleet View builder reads every status file and renders one card per report on the index page; (2) the Insights agent reads its own previous run's status for cross-week continuity (see DECISIONS.md entries 8, 22, and 24). The file is self-contained so the Fleet View card needs only this one file per report to render. Failure runs (status: fail) may omit dashboard_path and the continuity block (headline, trend, main_conclusions, top_3_actions) if the run halted before those values were produced. Schema locked 2026-05-21.",
   "type":    "object",
   "required": [
     "schema_version",
@@ -10,14 +10,9 @@
     "report_display_name",
     "week_end",
     "updated_at",
-    "dashboard_path",
     "status",
     "summary",
-    "warnings",
-    "headline",
-    "trend",
-    "main_conclusions",
-    "top_3_actions"
+    "warnings"
   ],
   "additionalProperties": false,
   "properties": {
@@ -57,7 +52,7 @@
 
     "dashboard_path": {
       "type": "string",
-      "description": "Relative path from the project root to the rendered dashboard HTML. The Fleet View card uses this to link out."
+      "description": "Relative path from the project root to the rendered dashboard HTML. The Fleet View card uses this to link out. Absent on failed runs that halted before the dashboard was rendered (Decision 24)."
     },
 
     "status": {
@@ -87,7 +82,7 @@
 
     "headline": {
       "type": "object",
-      "description": "The headline rate for the latest complete week this status covers. Read by next week's Insights agent for light continuity (Decision 8).",
+      "description": "The headline rate for the latest complete week this status covers. Read by next week's Insights agent for light continuity (Decision 8). Absent on failed runs that halted before the Insights agent ran (Decision 24).",
       "required": ["value", "unit"],
       "additionalProperties": false,
       "properties": {
@@ -104,7 +99,7 @@
 
     "trend": {
       "type": "object",
-      "description": "The trend signal for the per-week rate (OLS slope per Decision 6). Read by next week's Insights agent for continuity.",
+      "description": "The trend signal for the per-week rate (OLS slope per Decision 6). Read by next week's Insights agent for continuity. Absent on failed runs that halted before the Insights agent ran (Decision 24).",
       "required": ["direction", "slope", "slope_unit"],
       "additionalProperties": false,
       "properties": {
