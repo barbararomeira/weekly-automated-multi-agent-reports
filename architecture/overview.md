@@ -51,8 +51,16 @@ the methodology and the data, and emits:
         │   if any hard warning remains un-overridden, pipeline halts here.
         ▼
    ⑥ HTML SPLICER           [script — deterministic]
-        │   weekly_kpi_dashboard.html
-        │   status/<report_id>.json
+        │   reads narrative_blocks.json + CSVs, renders
+        │   weekly_kpi_dashboard.html.
+        │
+        │   POST-RENDER CHECK (Decision 23): parses out the headline KPI
+        │   value + unit and the trend-direction colour, compares each
+        │   against the pipeline-computed value. Mismatch halts as a hard
+        │   failure; no dashboard published. Broader correctness is
+        │   covered by dev-time tests on the splicer code.
+        │
+        │   writes status/<report_id>.json
         ▼
    ⑦ FLEET VIEW BUILDER     [script]
             fleet_view.html

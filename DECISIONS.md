@@ -639,3 +639,70 @@ one file per report to render. Reading every status file is the index
 builder's only filesystem dependency.
 
 ---
+
+## 23. HTML splicer correctness — hybrid safety net
+
+The Verifier agent (Decisions 9, 18) checks the *narrative prose* against the
+data. It does **not** check the rendered HTML — and the splicer pulls some
+displayed values (the headline KPI widget, chart bar heights, tables, slope
+line) directly from the CSVs without going through the narrative. A bug in
+the splicer code (wrong column, wrong filter, wrong rounding) could make
+those values disagree with the narrative without anything flagging it at
+runtime.
+
+**Chose**: a hybrid safety net.
+
+1. **Dev-time tests on the splicer code**. Unit tests with known CSV inputs
+   assert the rendered HTML contains the expected values; an integration
+   test against a golden fixture week exercises the full splicer pipeline.
+   These cover the broad surface area (every chart, table, widget).
+
+2. **Lightweight runtime check on two critical values**. After the splicer
+   produces the HTML, a small post-render step parses out and verifies:
+   - The headline KPI widget value + unit (the rate displayed at the top
+     of the dashboard).
+   - The headline trend direction (the green / red colour, derived from
+     the slope sign per Decision 21).
+
+   Both are compared against what the pipeline computed for the latest
+   complete week. Mismatch halts the run as a hard failure; no dashboard
+   published; the reviewer sees it on the Fleet View the same way as a
+   verifier-side hard warning.
+
+Broader runtime HTML parsing (chart bars, tables, per-pattern numbers) is
+**not** done — dev-time tests cover those, and runtime parsing of every
+element grows brittle and expensive as the layout evolves.
+
+**Considered**:
+- **Dev-time tests only** — trust the deterministic splicer entirely; rely
+  on unit + integration tests at development time.
+- **Full runtime HTML-vs-CSV check** — parse the entire rendered HTML and
+  verify every displayed number against the source CSVs.
+
+**Why hybrid**:
+
+- The headline KPI widget is the single highest-visibility number on the
+  dashboard. A splicer bug that displayed the wrong number there would be
+  the most damaging mistake the system could make. A two-value runtime
+  check is small, fast, and catches the worst case.
+- Beyond that, runtime HTML parsing grows brittle quickly — every chart
+  and table needs its own rule; parsers break on layout changes. Dev-time
+  tests are a better long-term home for that coverage.
+- The Verifier agent already provides a runtime safety net for the
+  narrative. The hybrid adds a deterministic check at the symmetrical
+  layer (the rendered output) without the maintenance burden of a full
+  HTML verifier.
+
+**Implementation note**: the runtime check lives inside the orchestrator's
+splicer step. On mismatch, the orchestrator writes a synthetic warning into
+`verifier_report.json` (using `category: "other"`) and sets the status to
+`fail`. From the reviewer's perspective, the failure mode is identical to a
+verifier-side hard warning — same Fleet View card, same `--override` flow
+(RUNBOOK scenario 1).
+
+**Future revisit**: if dev-time tests prove sufficient after a few real
+operating weeks, the runtime check can be removed without architectural
+impact — deletion is a small change. Reviewing this is an explicit
+post-POC task.
+
+---
