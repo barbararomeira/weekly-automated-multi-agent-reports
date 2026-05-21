@@ -77,21 +77,65 @@ def _load_pipeline_csvs(output_dir: Path) -> dict[str, str]:
 
 def _system_prompt(methodology: str, schema: dict) -> str:
     rules = (
-        "Rules:\n"
+        "Rules:\n\n"
+
+        "1. STRUCTURE\n"
         "- Lead with what is improving; end with the single highest-leverage opportunity.\n"
-        "- Use OLS-slope phrasing for trends; do not compare arbitrary period aggregates.\n"
-        "- Every number must include its unit.\n"
-        "- No comma separators in numerals.\n"
-        "- Refer to the customer and line by the names in the config; do not invent.\n"
-        "- Calibrate the strength of claims to data adequacy. Read productive_hours\n"
-        "  per week, total weeks available, and which shifts contributed each week.\n"
-        "  If the data is thin, describe what's there without anchoring strong claims\n"
-        "  on noisy signals.\n"
+        "- Refer to the customer and line by the names in the config; do not invent.\n\n"
+
+        "2. TREND FRAMING — SLOPE ONLY (the rule the agent breaks most often)\n"
+        "Use OLS slope across the per-week rate. Do NOT compare arbitrary period\n"
+        "aggregates as the primary trend statement.\n"
+        "  FORBIDDEN phrasings:\n"
+        "    ✗ 'up from W19', 'down from W19'\n"
+        "    ✗ 'compared to last week', 'compared to the prior week'\n"
+        "    ✗ 'rose from 18 to 84', 'jumped from X to Y'\n"
+        "    ✗ 'ticked up', 'ticked down', 'bounced from'\n"
+        "    ✗ 'Δ vs prior week', 'change from W19 to W20'\n"
+        "  REQUIRED phrasings:\n"
+        "    ✓ 'the OLS slope over the period is +X bags/h/wk'\n"
+        "    ✓ 'trending downward at -X bags/h/wk'\n"
+        "    ✓ 'the latest complete week sits at X bags/h; the OLS slope is Y bags/h/wk'\n\n"
+
+        "3. NO JUDGEMENT WORDS — describe metrics neutrally\n"
+        "  FORBIDDEN:  ✗ cleanest, slowest, best, worst, strongest, weakest,\n"
+        "              disappointing, poor, great, excellent, healthy, problematic\n"
+        "  REQUIRED:   ✓ 'has the lowest loss rate', 'has the highest loss rate',\n"
+        "              ✓ 'lower than', 'higher than', 'at X bags/h vs Y bags/h'\n\n"
+
+        "4. NO EVALUATIVE FRAMING — stay descriptive\n"
+        "  FORBIDDEN:  ✗ 'well inside the SOP', 'at the ceiling', 'comfortably below',\n"
+        "              ✗ 'concerning', 'reassuring', 'on track'\n"
+        "  REQUIRED:   ✓ 'below the SOP', 'near the SOP allowance',\n"
+        "              ✓ 'at X seconds against the Y-second SOP'\n\n"
+
+        "5. NUMBER FORMATTING\n"
+        "- Every number includes its unit. Always. (bags/h, pct, seconds, bags, hours)\n"
+        "- No comma separators in numerals. Write '8000' not '8,000'.\n\n"
+
+        "6. DATA ADEQUACY\n"
+        "- Calibrate claim strength. Read productive_hours per week, total weeks\n"
+        "  available, and which shifts contributed each week. If data is thin, describe\n"
+        "  what's there without anchoring strong claims on noisy signals.\n\n"
+
+        "7. CROSS-WEEK CONTINUITY\n"
         "- Process this week's data BEFORE anchoring on last week's. Form your own\n"
         "  conclusions from the new CSVs first; then check whether last week's\n"
         "  observations are still valid given the new data. Reference prior\n"
         "  observations only where the new data still supports them. Do NOT treat\n"
-        "  last week's blocks as a starting template.\n"
+        "  last week's blocks as a starting template.\n\n"
+
+        "8. MANDATORY SELF-CHECK BEFORE EMITTING\n"
+        "For EVERY numeric claim in your response, before you emit:\n"
+        "  a. Locate the exact CSV row + column the value comes from.\n"
+        "  b. Verify the value matches (no rounding errors, no fabricated values).\n"
+        "  c. Cross-check directional words ('up', 'down', 'rose', 'fell', 'increased',\n"
+        "     'decreased') against the actual values — does the data actually move in\n"
+        "     that direction?\n"
+        "  d. If a claim cannot be traced to a specific CSV cell, REMOVE it or rephrase\n"
+        "     as a qualitative statement.\n"
+        "  e. Cross-check counts ('14 weeks', '18 weeks') against the actual row count\n"
+        "     in the CSV — count carefully before stating.\n"
     )
     return (
         "You are a data-driven narrator for a weekly manufacturing report. Your job is "
@@ -123,6 +167,13 @@ def _user_prompt(config: dict, prior_status: dict, csv_texts: dict[str, str]) ->
         parts.append(f"--- {fn} ---")
         parts.append(text if text else "(missing)")
         parts.append("")
+    parts.append("FINAL REMINDERS before you emit:")
+    parts.append("- Every numeric claim must trace to a specific CSV cell. Cross-check before emitting.")
+    parts.append("- Every directional word ('up', 'down', 'rose', 'fell') must match the actual data values.")
+    parts.append("- Trend statements use OLS slope only. No 'up from W19' / 'rose from X to Y' phrasings.")
+    parts.append("- No judgement words: ✗ cleanest, slowest, best, worst, strongest, weakest.")
+    parts.append("- No evaluative framing: ✗ 'well inside', 'at the ceiling', 'comfortably below'.")
+    parts.append("")
     parts.append("Produce the narrative as a single JSON object conforming to the schema. "
                  "Do not include any prose, commentary, or markdown fences outside the JSON.")
     return "\n".join(parts)
