@@ -153,13 +153,23 @@ def _user_prompt(
 # ---------------------------------------------------------------------------
 
 def _extract_json(text: str) -> dict:
-    """Extract the JSON object from the response (tolerates ```json fences)."""
+    """Extract the first valid JSON object from the response.
+
+    Tolerates ```json fences, prose around the JSON, and trailing extra
+    characters / stray braces (uses raw_decode to find the end of the
+    first valid object, ignoring everything after).
+    """
     text = text.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text
         if "```" in text:
             text = text.rsplit("```", 1)[0]
-    return json.loads(text.strip())
+    text = text.strip()
+    first = text.find("{")
+    if first < 0:
+        raise json.JSONDecodeError("no '{' in response", text, 0)
+    obj, _ = json.JSONDecoder().raw_decode(text[first:])
+    return obj
 
 
 def _call_anthropic(system: str, user: str, schema_error: str = "") -> str:
