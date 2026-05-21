@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run the test suite
+        run: pytest -v --strict-markers
+
+      - name: Smoke-test the demo orchestrator
+        run: |
+          python run_weekly.py --mock --as-of 2026-05-21 \
+            --output-dir       /tmp/ci-outputs \
+            --status-dir       /tmp/ci-status \
+            --fleet-view-output /tmp/ci-fleet_view.html
+          test -f /tmp/ci-outputs/weekly_kpi_dashboard.html
+          test -f /tmp/ci-status/demo.json
+          test -f /tmp/ci-fleet_view.html
