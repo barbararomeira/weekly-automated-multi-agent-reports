@@ -525,3 +525,54 @@ the strength of claims to what the data supports. The data carries the
 signal; the prompt makes the agent attend to it.
 
 ---
+
+## 21. narrative_blocks.json schema locked at v1.0
+
+Schema: [`architecture/schemas/narrative_blocks.schema.json`](./architecture/schemas/narrative_blocks.schema.json).
+
+**Chose**: lock the schema at v1.0 with these fields:
+
+- `main_conclusions`: `{ headline, bullets[] }` where `bullets` is 4-6 items, each `{ title, body }` only — *no* `tone` field
+- `top_3_actions`: exactly 3 items, each `{ title, body }`
+- `drivers_insight`: single `{ title, body }`
+- `patterns`: three intro paragraphs (`by_shift_intro`, `by_weekday_intro`, `per_shift_trend_intro`)
+- `schema_version`: const `"1.0"`
+
+**Considered**:
+- Keep the `tone` field as the agent's call (good / watch / opportunity).
+- Make `tone` deterministic — code reads the bullet body after emission and
+  assigns the colour stripe.
+- Add a structured `data_caveats` field for sparse / partial-week notes,
+  rendered as a banner on the dashboard.
+
+**Why**:
+
+- **`tone` removed**. Subjective agent call invited verifier disagreement;
+  mixed-signal bullets (*"loss rate improved overall, but 2nd shift trending
+  down"*) had no clean answer. Removing the field removes the
+  argument-surface entirely. Bullets without colour stripes read as prose
+  rather than as alerts — appropriate for an operator audience.
+- **Colour moves to the KPI widgets only**, deterministically from the
+  per-week slope sign (improving → green, worsening → red, flat → neutral).
+  The eye expects a quick signal at the headline number; the prose carries
+  its own message without visual decoration. This logic lives in the
+  dashboard rendering code, not in the schema or the agent.
+- **No structured `data_caveats` field**. The report is built on
+  per-active-hour rates (Decision 1) so a sparse or partial week's rate is
+  still valid; the caveat is informational, not load-bearing. The agent
+  weaves any caveat into the body of the relevant bullet where the context
+  matters, rather than via a banner that would imply the data is suspect.
+- **4-6 bullets / exactly 3 actions / three pattern intros** carry over
+  from the v0 draft unchanged — the visual range had already been
+  prototyped and works.
+
+**Implication for the Insights agent**: tone selection drops out of the
+agent's job. One fewer thing for the agent to be wrong about and one fewer
+class of verifier warning. The agent still owns the positive-lean ordering
+(Decision 15) and the in-prose data-adequacy caveats (Decision 20).
+
+**Implication for the HTML splicer**: needs to compute KPI widget colours
+deterministically from the per-week slope sign, and keep the trend-chart
+slope line neutral (no green / red).
+
+---

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title":   "narrative_blocks",
-  "description": "DRAFT v0 — the prose blocks the Insights agent emits, consumed by the HTML splicer. Not finalised; iterating.",
+  "description": "v1.0 — the prose blocks the Insights agent emits, consumed by the HTML splicer. Schema locked 2026-05-21; see DECISIONS.md entry 21.",
   "type":    "object",
   "required": ["schema_version", "main_conclusions", "top_3_actions", "drivers_insight", "patterns"],
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "schema_version": {
       "type": "string",
       "description": "Version tag so the splicer knows how to handle future shape changes.",
-      "const": "0.1"
+      "const": "1.0"
     },
 
     "main_conclusions": {
@@ -31,7 +31,7 @@
           "maxItems": 6,
           "items": {
             "type": "object",
-            "required": ["title", "body", "tone"],
+            "required": ["title", "body"],
             "additionalProperties": false,
             "properties": {
               "title": {
@@ -44,12 +44,7 @@
                 "type": "string",
                 "minLength": 20,
                 "maxLength": 400,
-                "description": "Two to three sentences. Plain language. Numbers carry units. No comma separators in numerals. Period-aggregate comparisons forbidden."
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["good", "watch", "opportunity"],
-                "description": "Drives the bullet's color stripe on the dashboard. 'good' = green, 'watch' = amber, 'opportunity' = blue."
+                "description": "Two to three sentences. Plain language. Numbers carry units. No comma separators in numerals. Period-aggregate comparisons forbidden. If the week has data-adequacy caveats (partial week, sparse productive hours), weave them into the body of the relevant bullet rather than as a separate banner — the rate is still valid (Decision 1); the caveat is informational."
               }
             }
           }
