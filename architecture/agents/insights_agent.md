@@ -18,7 +18,7 @@ methodology — it follows the methodology document as ground truth.
 |---|---|---|
 | Latest weekly + daily CSVs | `outputs/*.csv` | The data being narrated |
 | Methodology document | `methodology/context.md` | Defines metric semantics, what's a valid framing, what's "improving" vs "worsening" |
-| Last week's compact status | `status/<report_id>.json` from the prior run | Light continuity — agent knows last week's headline value + trend direction, but not the prior narrative wording |
+| Last week's status | `status/<report_id>.json` from the prior run | Cross-week continuity — headline value, trend direction, last week's `main_conclusions` and `top_3_actions` (Decisions 8 + 22). Used as a *reference* layer, not as a template. |
 | Report config | `config/<report_id>.yaml` *(TBD)* | Customer name, line name, methodology constants (SOP, presence threshold, exclusion threshold) |
 
 Inputs are read at agent-call time, not embedded statically in the prompt.

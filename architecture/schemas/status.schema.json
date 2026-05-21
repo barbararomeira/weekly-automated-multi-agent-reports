@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title":   "status",
+  "description": "v1.0 — per-report status JSON written at the end of every pipeline run. Two consumers: (1) the Fleet View builder reads every status file and renders one card per report on the index page; (2) the Insights agent reads its own previous run's status for cross-week continuity (see DECISIONS.md entries 8 and 22). The file is self-contained so the Fleet View card needs only this one file per report to render. Schema locked 2026-05-21.",
+  "type":    "object",
+  "required": [
+    "schema_version",
+    "report_id",
+    "customer",
+    "report_display_name",
+    "week_end",
+    "updated_at",
+    "dashboard_path",
+    "status",
+    "summary",
+    "warnings",
+    "headline",
+    "trend",
+    "main_conclusions",
+    "top_3_actions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Version tag so consumers can handle future shape changes."
+    },
+
+    "report_id": {
+      "type": "string",
+      "description": "Internal stable identifier for the report (matches the config file name and the verifier_report.json's report_id)."
+    },
+
+    "customer": {
+      "type": "string",
+      "description": "Customer name. Used by the Fleet View builder to group cards."
+    },
+
+    "report_display_name": {
+      "type": "string",
+      "description": "Human-readable card title shown on the Fleet View."
+    },
+
+    "week_end": {
+      "type": "string",
+      "format": "date",
+      "description": "The last day of the week this status reflects (YYYY-MM-DD). Identifies which week's report this is."
+    },
+
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this status file was written (i.e., when the pipeline finished)."
+    },
+
+    "dashboard_path": {
+      "type": "string",
+      "description": "Relative path from the project root to the rendered dashboard HTML. The Fleet View card uses this to link out."
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["pass", "warn", "fail"],
+      "description": "Outcome of this pipeline run at the end (after the auto-fix loop). Mirrors verifier_report.status. pass = clean ship; warn = published with override(s); fail = halted, dashboard NOT generated. See DECISIONS.md entry 18."
+    },
+
+    "summary": {
+      "type": "object",
+      "description": "Warning counts for quick card formatting. Matches verifier_report.summary.",
+      "required": ["hard_count", "fixable_count"],
+      "additionalProperties": false,
+      "properties": {
+        "hard_count":    { "type": "integer", "minimum": 0 },
+        "fixable_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "warnings": {
+      "type": "array",
+      "description": "Copied verbatim from verifier_report.warnings so the Fleet View card is self-contained (one file per card to read). Item shape is the same as verifier_report.schema.json.",
+      "items": {
+        "$ref": "verifier_report.schema.json#/properties/warnings/items"
+      }
+    },
+
+    "headline": {
+      "type": "object",
+      "description": "The headline rate for the latest complete week this status covers. Read by next week's Insights agent for light continuity (Decision 8).",
+      "required": ["value", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "The numeric value (e.g. 9.2)."
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit string (e.g. \"bags/h\")."
+        }
+      }
+    },
+
+    "trend": {
+      "type": "object",
+      "description": "The trend signal for the per-week rate (OLS slope per Decision 6). Read by next week's Insights agent for continuity.",
+      "required": ["direction", "slope", "slope_unit"],
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": ["improving", "worsening", "flat"],
+          "description": "Categorical trend direction derived from the slope sign and the methodology's flat threshold."
+        },
+        "slope": {
+          "type": "number",
+          "description": "Numeric slope value (e.g. -0.3 means the rate is decreasing by 0.3 per week)."
+        },
+        "slope_unit": {
+          "type": "string",
+          "description": "Unit string for the slope (e.g. \"bags/h/wk\")."
+        }
+      }
+    },
+
+    "main_conclusions": {
+      "$ref": "narrative_blocks.schema.json#/properties/main_conclusions"
+    },
+
+    "top_3_actions": {
+      "$ref": "narrative_blocks.schema.json#/properties/top_3_actions"
+    }
+  }
+}

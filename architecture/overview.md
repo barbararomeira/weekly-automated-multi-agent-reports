@@ -87,8 +87,9 @@ index) is deterministic because the rules are deterministic.
   Schema: `architecture/schemas/narrative_blocks.schema.json`.
 - `outputs/verifier_report.json` — the Verifier agent's structured warnings.
   Schema: `architecture/schemas/verifier_report.schema.json`.
-- `status/<report_id>.json` — the per-report status consumed by the Fleet View.
-  Schema: `architecture/schemas/status.schema.json` *(TBD)*.
+- `status/<report_id>.json` — the per-report status consumed by the Fleet View
+  builder *and* by next week's Insights agent for cross-week continuity.
+  Schema: `architecture/schemas/status.schema.json`.
 
 ## Open questions (top of the stack)
 

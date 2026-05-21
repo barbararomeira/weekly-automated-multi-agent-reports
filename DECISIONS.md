@@ -146,6 +146,13 @@ Narrower contract, easier to reason about, easier to verify.
 
 ## 8. Insights agent is lightly stateful — reads last week's status JSON
 
+> **Expanded by Decision 22.** The "light state" was originally just the
+> headline value + trend direction. Decision 22 broadens it to include the
+> previous week's `main_conclusions` and `top_3_actions` blocks so the agent
+> can write genuine cross-week continuity (*"last week we flagged X; this
+> week..."*). Mitigations against framing inheritance are documented in
+> Decision 22.
+
 **Chose**: agent input = (current week's CSVs) + (methodology document) + (last
 week's compact status JSON containing headline value + trend direction). NOT the
 full previous narrative.
@@ -574,5 +581,61 @@ class of verifier warning. The agent still owns the positive-lean ordering
 **Implication for the HTML splicer**: needs to compute KPI widget colours
 deterministically from the per-week slope sign, and keep the trend-chart
 slope line neutral (no green / red).
+
+---
+
+## 22. Status JSON schema locked at v1.0; continuity expanded to include main conclusions + top 3 actions
+
+Schema: [`architecture/schemas/status.schema.json`](./architecture/schemas/status.schema.json).
+
+**Chose**: each pipeline run writes `status/<report_id>.json` conforming to
+v1.0 of the schema. The file serves two consumers:
+
+- **Fleet View builder**: reads every status file and renders one card per
+  report. Consumes `status`, `summary`, `warnings`, `report_display_name`,
+  `customer`, `week_end`, `updated_at`, `dashboard_path`.
+- **Next week's Insights agent**: reads its own previous status for
+  cross-week continuity. Consumes `headline`, `trend`, `main_conclusions`,
+  `top_3_actions`.
+
+The schema references `narrative_blocks.schema.json` and
+`verifier_report.schema.json` via `$ref`, so when those evolve, status.json
+auto-tracks.
+
+**Considered** (for the continuity portion specifically):
+- Stay with Decision 8's *headline value + trend direction only*.
+- Include *top_3_actions only* (no `main_conclusions`) — hedge that gives
+  follow-through continuity without the previous narrative's full framing.
+- Include the *full prior narrative* (every block including pattern intros
+  and drivers insight).
+
+**Why**: a weekly operations report serves the same team every Monday. The
+customer's value comes from the *thread* — did last week's flagged
+opportunity improve, was the top action acted on, did the trend they were
+worried about continue? Without that thread, every report reads as week
+zero. Decision 8 was conservative for fear that fully-stateful agents would
+inherit prior framing; the full-narrative option is still too much
+(crowds out fresh analysis with pattern intros / drivers insight), but
+`main_conclusions` + `top_3_actions` is the right middle ground — the
+customer-relevant context without the broader narrative scaffolding.
+
+**Mitigations against framing inheritance**:
+
+1. **Prompt ordering**. The Insights agent's prompt explicitly directs:
+   *"First, analyse this week's data and form your own insights. Then check
+   whether last week's observations are still valid given the new data.
+   Only reference prior observations where the new data still supports
+   them."* Prior context is a reference layer, not a template.
+2. **Verifier as safety net**. The Verifier agent (Decisions 9 + 18) catches
+   numeric claims that don't trace to the data. A stale inherited claim
+   should be flagged if the data no longer supports it.
+3. **Cheap revert**. If real runs show the agent leaning on prior framing
+   in ways the verifier misses, reverting to Decision 8's
+   headline + trend only is a small change.
+
+**Self-containment**: `warnings` are copied verbatim from
+`verifier_report.json` into status.json, so the Fleet View card needs only
+one file per report to render. Reading every status file is the index
+builder's only filesystem dependency.
 
 ---
