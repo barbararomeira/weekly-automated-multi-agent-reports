@@ -185,6 +185,11 @@ inputs diverge meaningfully.
 
 ## 10. Severity-based verifier failure handling
 
+> **Refined by Decision 18.** The original two-tier model (hard halts / soft
+> surfaces) has been superseded by an auto-fix loop. The intent — distinguish
+> what halts from what doesn't — is preserved; the soft tier is removed and an
+> automated correction step now sits between the verifier and the reviewer.
+
 **Chose**:
 - **Hard errors** (e.g., a number in narrative does not exist in the data) →
   pipeline halts, status JSON marked `failed`, dashboard NOT generated.
@@ -373,5 +378,64 @@ records the `justification` but not a separate `reviewer` identifier. If more
 than one person reviews in future, that field is a small additive change.
 
 See [RUNBOOK.md](./RUNBOOK.md) scenario 1 for the operational walk-through.
+
+---
+
+## 18. Auto-fix loop for fixable warnings; soft-warning tier removed
+
+**Chose**: the verifier classifies each warning as `severity: hard` or
+`severity: fixable`. The orchestrator handles each class differently:
+
+- **Fixable** — missing or wrong units, methodology framing rules, structural
+  format issues. The orchestrator hands the warning back to the Insights agent
+  with a tight prompt:
+  > *"You wrote `<the bullet>`. The verifier flagged: `<the issue>`. Fix only
+  > this block, return the corrected JSON."*
+
+  Insights re-emits just that block; the verifier re-checks; cap at 2 retries.
+  If clean after the loop, the dashboard ships clean — the reviewer is not
+  involved.
+- **Hard** — narrative fabrication: a number or claim in the narrative that
+  doesn't trace to a value in the CSVs. Pipeline halts immediately, no
+  auto-fix attempted. The reviewer either fixes the root cause and re-runs,
+  or uses `--override` (Decision 17) to publish anyway.
+
+If the auto-fix loop exhausts its retries on a fixable warning, that warning is
+escalated to hard severity — same halt-and-reviewer path as fabrication.
+
+The original "soft warning" tier from Decision 10 is removed. Under this
+model, the dashboard either ships **clean** (everything passed or was auto-fixed
+in the loop) or **halts** (reviewer judgment required). The Fleet View has no
+"yellow with informational warnings" state; 🟡 is reserved for "published with
+override" only.
+
+**Considered**:
+- *Keep the soft tier*: let the dashboard ship with informational warnings
+  visible inline. Reviewer scans them but isn't required to act.
+- *Auto-fix loop AND a soft tier*: auto-fix strict-rule violations; surface
+  stylistic things as soft warnings.
+- *Reading 1 — surface every auto-fix to the reviewer*: even when the loop
+  succeeds, the reviewer sees an "orientation" list of what was fixed. More
+  audit visibility at the cost of reviewer load.
+
+**Why**: the primary goal is an accurate report — accuracy first. The secondary
+goal is to minimise the time the reviewer spends per week. The auto-fix loop
+serves both: it eliminates the trivial corrections (missing units, framing tics)
+automatically, and only escalates when the agent can't get something right after
+being told. The reviewer's inbox stays small and high-signal.
+
+The "surface every auto-fix" option (Reading 1) would have given more audit
+visibility but at the cost of putting more on the reviewer's screen each week —
+defeating the goal. Auto-fixes are still recorded in `verifier_report.json` and
+in the per-report status JSON for audit; they're just not surfaced on the
+Fleet View card or the dashboard by default.
+
+The "keep soft tier" option preserves the original two-tier model from
+Decision 10 but doesn't take advantage of the agent's ability to fix its own
+mistakes when told what's wrong. Auto-fix turns most soft warnings into a
+non-event.
+
+See [RUNBOOK.md](./RUNBOOK.md) scenario 2 for what happens when the auto-fix
+loop exhausts.
 
 ---

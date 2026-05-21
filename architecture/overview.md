@@ -38,6 +38,13 @@ the methodology and the data, and emits:
    ⑤ VERIFIER AGENT         [LLM]
         │   outputs/verifier_report.json (severity-tagged warnings)
         ▼
+   ⑤b AUTO-FIX LOOP         [orchestrator + LLM]
+        │   for each fixable warning, send back to ④ Insights for a
+        │   targeted re-emit; re-run ⑤; cap at 2 retries; escalate to
+        │   hard if exhausted (Decision 18)
+        │
+        │   if any hard warning remains un-overridden, pipeline halts here.
+        ▼
    ⑥ HTML SPLICER           [script — deterministic]
         │   weekly_kpi_dashboard.html
         │   status/<report_id>.json
@@ -74,7 +81,7 @@ index) is deterministic because the rules are deterministic.
 - `outputs/narrative_blocks.json` — the Insights agent's structured output.
   Schema: `architecture/schemas/narrative_blocks.schema.json`.
 - `outputs/verifier_report.json` — the Verifier agent's structured warnings.
-  Schema: `architecture/schemas/verifier_report.schema.json` *(TBD)*.
+  Schema: `architecture/schemas/verifier_report.schema.json`.
 - `status/<report_id>.json` — the per-report status consumed by the Fleet View.
   Schema: `architecture/schemas/status.schema.json` *(TBD)*.
 
@@ -85,5 +92,5 @@ index) is deterministic because the rules are deterministic.
 - Where the agents are invoked from (orchestrator script structure, retry policy).
 - Cost / model choice per agent (probably Sonnet for insights, Haiku for verifier,
   but unconfirmed).
-- Failure-mode coverage in the verifier's prompt — specifically what "hard error"
-  vs "soft warning" looks like in practice.
+- Pipeline self-audit (step ③ above) — what invariants does it check, where
+  does it live, what does it output? *(Open — E)*

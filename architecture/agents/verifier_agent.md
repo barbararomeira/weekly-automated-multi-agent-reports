@@ -17,8 +17,16 @@ agent:
    complete week's row of `weekly_production_opportunity.csv`.)
 
 This agent **does not** rewrite the narrative; it only emits a warnings report.
-The pipeline halts on hard errors and continues with surface-warnings on soft
-errors.
+The orchestrator reads that report and reacts:
+
+- **Fixable warnings** (e.g. missing units, methodology framing tics) → the
+  orchestrator runs an auto-fix loop: hands the warning back to the Insights
+  agent for a targeted re-emit, then re-runs the verifier. Up to 2 retries.
+- **Hard warnings** (e.g. a number in the narrative that doesn't exist in the
+  data) → pipeline halts. The reviewer either fixes the root cause and re-runs,
+  or uses `--override` to publish despite the warning.
+
+There is no "soft warning" tier — see Decision 18.
 
 ## Inputs
 
@@ -38,17 +46,37 @@ already know is wrong.
 [`architecture/schemas/verifier_report.schema.json`](../schemas/verifier_report.schema.json).
 Summary of the structure:
 
-- `report_id`, `status` (`pass` / `warn` / `fail`), `checks_run`, `summary` (counts of hard + soft), and an array of `warnings`.
-- Each warning has a stable `id` (e.g. `w1`), `severity`, `category`, the `claim` from the narrative, its `location` (JSON-path into `narrative_blocks.json`), the `issue`, the `evidence`, an optional `suggestion`, an optional `rule_id` pointing to a methodology section, and an `override` block.
+- `report_id`, `status` (`pass` / `warn` / `fail`), `checks_run`, `summary` (`hard_count` + `fixable_count`), and an array of `warnings`.
+- Each warning has a stable `id` (e.g. `w1`), `severity` (`hard` or `fixable`), `category`, the `claim` from the narrative, its `location` (JSON-path into `narrative_blocks.json`), the `issue`, the `evidence`, an optional `suggestion`, an optional `rule_id` pointing to a methodology section, and an `override` block.
 - The `override` block contains `overridden: bool` and a `justification` string — populated by the orchestrator's `--override` flag when the reviewer bypasses a hard error.
 
-**Status semantics:**
+**Status semantics** (reflect the state at the end of the run, *after* the auto-fix loop has run):
 
-- `pass` — no warnings.
-- `warn` — soft warnings only, OR all hard errors have been overridden by the reviewer (justifications recorded in each `override.justification`).
-- `fail` — at least one un-overridden hard error; pipeline halts; dashboard NOT generated.
+- `pass` — no warnings remain, OR every fixable warning was resolved by the auto-fix loop.
+- `warn` — at least one hard error exists, but every hard error has been overridden by the reviewer (justifications recorded in each `override.justification`). Dashboard publishes with inline reviewer flags.
+- `fail` — at least one un-overridden hard error remains; pipeline halts; dashboard NOT generated.
 
-## Override workflow
+## Auto-fix loop (fixable warnings)
+
+When the verifier flags a warning with `severity: fixable`, the orchestrator runs
+an automated correction loop *before* deciding the overall status:
+
+1. The orchestrator picks up each fixable warning from `verifier_report.json`.
+2. It hands the warning back to the Insights agent with a tight, scoped prompt:
+   > "You wrote `<exact claim>` at `<location>`. The verifier flagged: `<issue>`. The evidence is: `<evidence>`. Fix only this block, return the corrected JSON for `<location>`."
+3. The Insights agent re-emits just that block (not the full narrative).
+4. The block is patched into `narrative_blocks.json`.
+5. The verifier re-runs on the updated narrative.
+6. If the warning is gone, the loop succeeds for that warning. If the warning
+   still flags, repeat — capped at 2 retries.
+7. If the warning still flags after the retry cap, it is escalated to
+   `severity: hard` (same halt + reviewer path as fabrication).
+
+The reviewer never sees a fixable warning that the loop resolved. They only
+see warnings on the dashboard if (a) the verifier flagged a hard error, or (b)
+a fixable warning escalated after exhausting its retries.
+
+## Override workflow (hard warnings only)
 
 When the verifier emits `status: fail`, the pipeline halts and the Fleet View card surfaces each hard warning inline (claim + issue + evidence + the override command). The reviewer can either fix the root cause and re-run normally, or — if convinced the warning is a false positive — bypass it:
 
@@ -79,12 +107,14 @@ warning must quote the exact claim and reference either a methodology rule or a
 CSV cell as evidence.
 
 Severity rules:
-- HARD: a numeric claim that does not exist in the data, or a direct violation
-  of a methodology rule explicitly stated as "MUST" in the methodology
-  document. Hard errors halt the pipeline.
-- SOFT: tone drift, weak framing, ambiguous phrasing, or methodology guidance
-  the document expresses as "SHOULD" rather than "MUST". Soft warnings surface
-  to the human reviewer.
+- HARD: a numeric claim or factual assertion that does not trace to the data —
+  the agent has fabricated or mis-stated something the data does not support.
+  Hard errors halt the pipeline; they cannot be fixed by re-rendering text.
+- FIXABLE: a violation of a methodology rule that the agent can correct by
+  rewriting the offending block — missing or wrong units, forbidden framing
+  (e.g. period-aggregate comparisons), judgemental tone words, structural
+  format issues. The orchestrator will hand each fixable warning back to the
+  Insights agent for a targeted re-emit.
 
 METHODOLOGY DOCUMENT
 {contents of context.md}
@@ -115,14 +145,15 @@ explanatory text outside the JSON.
 | Narrative compares "Jan-Feb vs April" as the headline trend statement | Direct methodology violation — Decision #6 / §8 says the per-week slope is the headline |
 | Narrative references a customer name not in the report config | Direct misattribution |
 
-## What "soft warning" looks like (examples)
+## What "fixable" looks like (examples)
 
-| Example | Why it's soft |
+| Example | Why it's fixable |
 |---|---|
-| Narrative leads with the worst metric instead of leading with what's improving | Tone drift — the methodology prefers positive-first framing but doesn't mandate it |
-| Slope is reported as "+0.41" but methodology rounds to "+0.4" | Precision style — cosmetic |
-| Pattern intro references a shift the latest data doesn't actually mention | Soft, because the claim may still be reasonable in context |
-| Narrative cites a partial week's value as if it were complete | Soft, because the data is real but the framing is misleading |
+| Narrative writes "loss rate of 12.45" with no unit | The right value, the right framing — just missing `bags/h`. Agent is told to add the unit; re-emit. |
+| Narrative compares "January-February vs April" as the headline trend | Forbidden framing per Decision 6 / §8 (period aggregates instead of the per-week slope). Agent is told to re-state the trend as a slope; re-emit. |
+| Narrative leads with the worst metric instead of leading with what's improving | Methodology rule on positive-first framing (Decision 15). Agent is told to lead with the improving metric; re-emit. |
+| Slope reported as "+0.41" when methodology rounds to "+0.4" | Precision style. Agent is told to round to 1 decimal; re-emit. |
+| Narrative uses a judgement word like "disappointing" | Methodology forbids judgement language. Agent is told to use neutral phrasing; re-emit. |
 
 ## Failure modes (the verifier itself)
 
@@ -130,7 +161,8 @@ explanatory text outside the JSON.
 |---|---|---|
 | Schema-non-conforming verifier output | JSON-schema validation post-call | retry once with the schema error; if still bad, halt as if hard error |
 | API error / timeout | wrapper script | retry with backoff; halt after N attempts |
-| Verifier flags a hard error that is actually a false positive | Manual review when status shows `fail` and the run halts | TBD — should there be an override mechanism? |
+| Verifier flags a hard error that is actually a false positive | Manual review when status shows `fail` and the run halts | Reviewer uses `--override <warning_id> "<justification>"` to publish anyway (Decision 17 / RUNBOOK scenario 1) |
+| Auto-fix loop runs out of retries on a fixable warning | Orchestrator escalates the warning to `severity: hard` | Same halt + override path as fabrication (RUNBOOK scenario 2) |
 | Verifier misses a real bug ("silent pass") | Catches via human review of the eventual dashboard | Reduces over time as prompt is tuned |
 
 ## Cost notes
@@ -145,8 +177,7 @@ explanatory text outside the JSON.
 
 - ~~Schema for `verifier_report.json`~~ **Resolved 2026-05-21** — see [`architecture/schemas/verifier_report.schema.json`](../schemas/verifier_report.schema.json) and DECISIONS.md entry 16.
 - ~~Hard-error override mechanism~~ **Resolved 2026-05-21** — CLI flag `--override <warning_id> "<justification>"`. See DECISIONS.md entry 17 and RUNBOOK.md scenario 1.
-- How is the methodology document parsed for "MUST" vs "SHOULD" rules? Currently
-  these are not strictly tagged. Worth marking them up explicitly. *(Open — A.3)*
+- ~~Hard vs soft vs fixable classification~~ **Resolved 2026-05-21** — auto-fix loop for fixable; immediate halt for hard; soft tier removed. See DECISIONS.md entry 18 and RUNBOOK.md scenario 2.
 - Should the verifier also check for *missing* coverage (i.e., the narrative
   failed to mention an important week-over-week change)? More ambitious — might
   belong to a separate "coverage" agent later. *(Open — A.4)*

@@ -48,17 +48,46 @@ The justification is mandatory; the command will fail without it.
 
 ---
 
-## 2. Verifier flagged SOFT warnings only (🟡 on Fleet View)
+## 2. Auto-fix loop exhausted on a fixable warning (🔴 on Fleet View, halted)
 
-**Symptom.** Dashboard was generated. Fleet View card shows 🟡. Inline "Reviewer flags" section is visible at the top of the dashboard listing the warnings.
+**Symptom.** Fleet View card shows 🔴. Dashboard was NOT generated. The card displays a hard warning that was *originally* classified as `fixable` — the warning text usually mentions the same issue twice ("still flagged after 2 auto-fix attempts"). Look at `outputs/verifier_report.json` to confirm: the warning's history shows it cycled through the auto-fix loop and was escalated.
 
-**Action.** None required to publish — the dashboard is already live. But before sharing externally:
+**Example.**
 
-1. Skim each soft warning on the dashboard.
-2. If any look like real problems (not cosmetic), treat them like a hard error: fix the root cause and re-run.
-3. If they're cosmetic / acceptable, you can leave the dashboard as-is. The warnings stay on the dashboard as part of the audit trail.
+```
+🔴 <report name>
+   Updated 06:14 · FAILED verification
 
-**You do not need to "approve" anything.** Soft warnings are informational; they're already part of the published dashboard.
+   Hard error w3 (escalated from fixable after 2 retries): The bullet at
+   main_conclusions.bullets[2].body still has a number without a unit
+   after the Insights agent was asked twice to add one.
+
+   → To override and publish anyway:
+     python run_weekly.py --override w3 "<your reason>"
+```
+
+**Diagnosis.** The Insights agent was told twice to fix the same problem and kept producing the same issue. Usually one of:
+
+| Cause | Signal | Fix |
+|---|---|---|
+| The Insights system prompt is missing a constraint the auto-fix nudge can't compensate for | Same kind of warning recurs week after week | Edit the Insights system prompt to enforce the rule directly (e.g., "every numeric value in the narrative must carry a unit"); re-run from scratch |
+| The auto-fix nudge itself was too vague — the agent didn't understand what to fix | The retried block is different but the same warning still fires | Tighten the auto-fix prompt template; re-run from scratch |
+| The verifier is wrong (false positive) — there's no real issue and the agent kept re-emitting the same valid block | The flagged block looks correct on inspection | Override (see below) |
+
+**Action.** For the prompt-fix cases, re-run normally:
+
+```bash
+cd ~/Desktop/weekly-automated-multi-agent-reports
+python run_weekly.py
+```
+
+For a verifier false positive, override:
+
+```bash
+python run_weekly.py --override w3 "<short, specific reason — what made this a false positive>"
+```
+
+**Expected result.** Same as scenario 1 — pipeline re-runs, status drops from `fail` to `warn` if overridden, Fleet View flips 🔴 → 🟡 with the warning visible inline on the dashboard.
 
 ---
 
@@ -138,7 +167,8 @@ This re-reads every `status/*.json` and regenerates the index. If a report has n
 
 ## Glossary
 
-- **Hard error** — verifier found a claim in the narrative that contradicts the data, or a direct violation of a methodology MUST rule. Pipeline halts; dashboard not generated.
-- **Soft warning** — verifier flagged something worth a human's attention (tone drift, weak framing, methodology SHOULD violation). Dashboard renders; warning is visible inline.
-- **Override** — reviewer-driven re-run that publishes the dashboard despite a hard error, with a justification recorded for audit.
+- **Hard warning** — a claim in the narrative that doesn't trace to the data (fabrication). Pipeline halts; dashboard not generated until the root cause is fixed or the reviewer overrides.
+- **Fixable warning** — a methodology compliance issue the Insights agent can correct by rewriting the offending block (missing/wrong units, framing tics, forbidden phrasings). Handled by the auto-fix loop without reviewer involvement.
+- **Auto-fix loop** — for each fixable warning, the orchestrator hands the warning back to the Insights agent with a targeted prompt, gets the re-emitted block, and re-runs the verifier. Capped at 2 retries; on exhaustion, the warning is escalated to hard.
+- **Override** — reviewer-driven re-run that publishes the dashboard despite a hard warning, with a justification recorded for audit. Reserved for verifier false positives.
 - **Partial week** — a week whose end date is in the future relative to "today." Rendered with lighter bars in the charts; never used as a headline number in the widgets.

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title":   "verifier_report",
-  "description": "Output from the Verifier agent: the warnings report consumed by the orchestrator (for halt-or-continue decisions), the Fleet View builder (for the status chip + count), and the HTML splicer (for the inline Reviewer flags section). Schema locked 2026-05-21.",
+  "description": "Output from the Verifier agent: the warnings report consumed by the orchestrator (which runs the auto-fix loop for fixable warnings and halts on hard warnings), the Fleet View builder (for the status chip + count), and the HTML splicer (for the inline Reviewer flags section). Schema locked 2026-05-21; severity enum updated for the auto-fix model (Decision 18).",
   "type":    "object",
   "required": ["report_id", "status", "checks_run", "summary", "warnings"],
   "additionalProperties": false,
@@ -15,7 +15,7 @@
     "status": {
       "type": "string",
       "enum": ["pass", "warn", "fail"],
-      "description": "Overall outcome. pass = no warnings. warn = soft warnings only, OR all hard errors have been overridden by the reviewer. fail = at least one un-overridden hard error; dashboard not generated."
+      "description": "Overall outcome at the end of the run (after the auto-fix loop). pass = no warnings, OR all fixable warnings were resolved by the auto-fix loop. warn = at least one hard error exists but every hard error has been overridden by the reviewer; dashboard publishes with inline reviewer flags. fail = at least one un-overridden hard error remains; dashboard not generated."
     },
 
     "checks_run": {
@@ -26,12 +26,20 @@
 
     "summary": {
       "type": "object",
-      "description": "Counts at the top level for quick at-a-glance reading. Consumed by the Fleet View card to render its display string (e.g. '2 warnings').",
-      "required": ["hard_count", "soft_count"],
+      "description": "Counts at the top level for quick at-a-glance reading. Consumed by the Fleet View card to render its display string.",
+      "required": ["hard_count", "fixable_count"],
       "additionalProperties": false,
       "properties": {
-        "hard_count": { "type": "integer", "minimum": 0 },
-        "soft_count": { "type": "integer", "minimum": 0 }
+        "hard_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of warnings with severity = hard at the end of the run. Includes fixables that were escalated to hard after exhausting their retry cap in the auto-fix loop."
+        },
+        "fixable_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of warnings that were classified fixable and successfully resolved by the auto-fix loop. Audit-trail signal of how many corrections the agent needed this week."
+        }
       }
     },
 
@@ -50,7 +58,8 @@
           },
           "severity": {
             "type": "string",
-            "enum": ["hard", "soft"]
+            "enum": ["hard", "fixable"],
+            "description": "hard = a claim or number that doesn't trace to the data (fabrication); pipeline halts immediately, no auto-fix attempted. fixable = a methodology compliance issue or formatting violation (missing/wrong units, framing rules, structural format); orchestrator runs the auto-fix loop, max 2 retries, then escalates to hard if unresolved."
           },
           "category": {
             "type": "string",
