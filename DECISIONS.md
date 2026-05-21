@@ -885,3 +885,62 @@ even at 10× the report volume the system stays well under $200/year.
 - Anthropic releases newer / cheaper variants — re-evaluate.
 
 ---
+
+## 27. Repo strategy: portfolio as canonical codebase; laptop instance via clone + private config
+
+**Chose**: a single codebase shared between two purposes via git clone +
+private (git-ignored) configuration.
+
+- **Portfolio repo** (`weekly-automated-multi-agent-reports` on GitHub):
+  the canonical, customer-agnostic implementation. Holds all design docs,
+  all code, and synthetic / dummy data fixtures that allow the system to
+  be run end-to-end as a working demonstration. Pushable and
+  public-shareable. *Purpose*: showcase that the multi-agent workflow
+  is real and runnable.
+- **Laptop working instance** (separate directory on the operator's
+  laptop): a clone of the portfolio repo with the real customer's data
+  and config added locally. `config/<report_id>.yaml` (customer name,
+  line name, thresholds) and `inputs/` (real CSVs) are both git-ignored
+  so the customer details never leak back to the portfolio. *Purpose*:
+  actually generate the customer's weekly report.
+
+The code is shared. Only configuration and data differ between the two
+instances.
+
+**Considered**:
+- *Two separate codebases* — portfolio one place, customer instance
+  another, changes propagated by hand.
+- *Duplicate docs into the working folder for offline reference* alongside
+  the separate-codebases path.
+- *Mirror via rsync / symlinks* to keep code in sync across two physical
+  copies.
+
+**Why**:
+- One codebase keeps the portfolio honest: the demo runs the same code
+  that serves the real customer. There's no *"the portfolio is a
+  lookalike of the real thing"* gap — they **are** the same thing.
+- Updates to the architecture or any agent are made once and immediately
+  available to both instances via `git pull` on the laptop clone.
+- The customer details are segregated physically by `.gitignore`, not by
+  manual hygiene — far harder to leak by accident.
+- Design docs live in one place (the portfolio repo). The laptop clone
+  has them by virtue of being a clone. No duplication, no sync drift.
+
+**Migration path** for the existing pre-multi-agent working folder
+(the operator's current customer-specific scripts + data):
+
+1. Build the multi-agent code in the portfolio repo with synthetic
+   fixtures (Phase 2 of the build).
+2. On the laptop, clone the portfolio into a fresh directory.
+3. Drop the real `config/<report_id>.yaml` and `inputs/` CSVs into the
+   clone (both git-ignored).
+4. Run weekly from the new clone.
+5. Retire the old pre-multi-agent working folder once the new instance
+   is producing reliably; keep the originals archived offline.
+
+**Implication for `.gitignore`** (already in place):
+`config/*.yaml` (excluding `*.example.yaml`), `inputs/`, `outputs/`,
+`status/`, and generated `*.html` are all ignored. Only the
+customer-agnostic example configs are tracked.
+
+---
