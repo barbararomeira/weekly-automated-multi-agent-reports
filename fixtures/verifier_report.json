@@ -1,0 +1,7 @@
+{
+  "report_id": "demo",
+  "status": "pass",
+  "checks_run": ["methodology_compliance", "data_sync"],
+  "summary": { "hard_count": 0, "fixable_count": 0 },
+  "warnings": []
+}
