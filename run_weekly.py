@@ -64,6 +64,16 @@ MOCK_VERIFIER_REPORT = REPO_ROOT / "fixtures" / "verifier_report.json"
 MAX_FIX_ATTEMPTS = 2  # Decision 18 — auto-fix loop retry cap
 
 
+def _display_path(p: Path) -> str:
+    """Show p relative to the repo when possible (for log readability),
+    otherwise absolute. The orchestrator may be invoked with paths outside
+    the repo root (e.g., from integration tests pointing at a tmp dir)."""
+    try:
+        return str(p.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(p)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -176,7 +186,7 @@ def _step_insights(args: argparse.Namespace, narrative_path: Path) -> None:
     print("④  insights agent...")
     if args.mock:
         _validated_copy(MOCK_NARRATIVE, narrative_path, NARRATIVE_SCHEMA)
-        print(f"     (mock — used {MOCK_NARRATIVE.relative_to(REPO_ROOT)})")
+        print(f"     (mock — used {_display_path(MOCK_NARRATIVE)})")
         return
     insights_agent.generate(
         methodology_path  = DEFAULT_METHODOLOGY,
@@ -193,7 +203,7 @@ def _step_verifier(args: argparse.Namespace,
     print("⑤  verifier agent...")
     if args.mock:
         _validated_copy(MOCK_VERIFIER_REPORT, report_path, VERIFIER_SCHEMA)
-        print(f"     (mock — used {MOCK_VERIFIER_REPORT.relative_to(REPO_ROOT)})")
+        print(f"     (mock — used {_display_path(MOCK_VERIFIER_REPORT)})")
         return
     verifier.verify(
         narrative_path   = narrative_path,
@@ -301,15 +311,15 @@ def _step_splicer(args: argparse.Namespace,
         narrative        = narrative,
         reviewer_flags   = expected["reviewer_flags"],
     )
-    print(f"     wrote dashboard → {html_path.relative_to(REPO_ROOT)}")
-    print(f"     wrote status    → {status_path.relative_to(REPO_ROOT)}")
+    print(f"     wrote dashboard → {_display_path(html_path)}")
+    print(f"     wrote status    → {_display_path(status_path)}")
     return html_path
 
 
 def _step_fleet_view(args: argparse.Namespace) -> None:
     print("⑦  Fleet View builder...")
-    n = build_fleet_view.build(args.status_dir, DEFAULT_FLEET_VIEW)
-    print(f"     wrote fleet view with {n} card(s) → {DEFAULT_FLEET_VIEW.relative_to(REPO_ROOT)}")
+    n = build_fleet_view.build(args.status_dir, args.fleet_view_output)
+    print(f"     wrote fleet view with {n} card(s) → {_display_path(args.fleet_view_output)}")
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +361,10 @@ def main() -> None:
     parser.add_argument(
         "--status-dir", type=Path, default=DEFAULT_STATUS_DIR,
         help="Status directory (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--fleet-view-output", type=Path, default=DEFAULT_FLEET_VIEW,
+        help="Where to write fleet_view.html (default: %(default)s)",
     )
     parser.add_argument(
         "--config", type=Path, default=DEFAULT_CONFIG,
@@ -410,7 +424,7 @@ def main() -> None:
         )
         # Rebuild the fleet view so the failure is visible
         try:
-            build_fleet_view.build(args.status_dir, DEFAULT_FLEET_VIEW)
+            build_fleet_view.build(args.status_dir, args.fleet_view_output)
         except Exception:
             pass
         sys.exit(1)
