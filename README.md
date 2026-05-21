@@ -32,6 +32,20 @@ The agent boundary is narrow on purpose: only the two LLM agents above. Data ext
 
 Next phase: implementation. Code that realises the design is not yet committed in this repo. Each phase is scoped intentionally and shipped one at a time.
 
+## Installing (dev)
+
+Requires Python 3.11+. From the repo root:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This installs the runtime dependencies plus the dev extras (pytest, ruff). Using [uv](https://github.com/astral-sh/uv) instead:
+
+```bash
+uv pip install -e ".[dev]"
+```
+
 ## Confidentiality
 
 This is a portfolio project. No real customer data, customer names, employer-specific tooling, or internal endpoints appear in committed files. Real customer values live in untracked local configs.
