@@ -306,3 +306,72 @@ basic clarity rule for an audience that includes production operators, not just
 analysts.
 
 ---
+
+## 16. Verifier report schema
+
+**Chose**: the verifier emits a structured JSON file conforming to
+[`architecture/schemas/verifier_report.schema.json`](./architecture/schemas/verifier_report.schema.json).
+Top level: `report_id`, `status` (`pass`/`warn`/`fail`), `checks_run`, `summary`
+(`{hard_count, soft_count}`), `warnings[]`. Each warning has a stable `id`
+(`w1`, `w2`, …), `severity`, `category`, `claim`, `location` (JSON-path into the
+narrative), `issue`, `evidence`, optional `suggestion`, optional `rule_id`
+(reference to a methodology section), and an `override` block (`overridden: bool`,
+`justification: str`).
+
+**Considered**:
+- A human-readable single-string `summary` instead of structured counts.
+- A richer audit envelope at the top (`generated_at`, `verifier_model`,
+  reviewer name).
+- A minimal schema without the `override` block — relying on a separate file
+  for the audit trail.
+
+**Why**: counts in `summary` keep the data structured so the Fleet View card can
+format the display string itself — `2 warnings`, `1 hard 2 soft`, or anything
+else — without changing the verifier. A stable `id` per warning makes the
+override CLI possible (it has something specific to target). Embedding the
+`override` block inside the warning keeps the audit trail in one place: you
+read the file and you see which warnings were overridden and why. The extra
+envelope fields (`generated_at`, model identifier, reviewer name) were dropped
+to keep the schema lean for the POC — they can be added later without breaking
+existing consumers.
+
+---
+
+## 17. Reviewer override via CLI flag
+
+**Chose**: when the verifier emits `status: fail`, the reviewer can publish the
+dashboard anyway by re-running the pipeline with a CLI flag:
+
+```bash
+python run_weekly.py --override <warning_id> "<justification>"
+```
+
+The justification is mandatory; the orchestrator refuses to run the command
+without it. On re-run, the targeted warning's `override` block is populated,
+the status drops from `fail` to `warn`, and the dashboard renders with an
+inline "Reviewer flags" section showing the overridden warning + justification.
+
+**Considered**:
+- *Manual JSON edit*: open `verifier_report.json` in an editor, flip
+  `overridden: true`, type a justification, save, re-run. No CLI work, no
+  extra code — but no enforcement (you could forget the justification) and
+  no audit hook on the command itself.
+- *No override at all*: if the verifier flags a hard error, you must fix the
+  underlying problem (correct the narrative, update the methodology, or
+  tighten the agent prompt) and re-run. Strictest possible.
+
+**Why**: the CLI flag enforces a structured override (you cannot bypass without
+a justification), the command itself is the audit trail (shell history records
+when overrides happened), and re-running the verifier confirms that only the
+warning you named was bypassed — nothing else snuck through. The
+"no override" option is too brittle for a POC where the verifier is still
+being calibrated and false positives are likely. The manual-JSON-edit option
+reaches the same end state but with none of the enforcement.
+
+The reviewer is always the project owner for the POC, so the override block
+records the `justification` but not a separate `reviewer` identifier. If more
+than one person reviews in future, that field is a small additive change.
+
+See [RUNBOOK.md](./RUNBOOK.md) scenario 1 for the operational walk-through.
+
+---
