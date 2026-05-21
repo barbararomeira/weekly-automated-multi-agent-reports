@@ -91,7 +91,7 @@
           },
           "override": {
             "type": "object",
-            "required": ["overridden", "justification"],
+            "required": ["overridden", "justification", "overridden_at"],
             "additionalProperties": false,
             "properties": {
               "overridden": {
@@ -101,6 +101,11 @@
               "justification": {
                 "type": "string",
                 "description": "Reviewer's reason for publishing despite this warning. Must be non-empty when overridden = true; the orchestrator's --override flag enforces this."
+              },
+              "overridden_at": {
+                "type": ["string", "null"],
+                "format": "date-time",
+                "description": "ISO 8601 timestamp recording when the reviewer's --override CLI invocation was applied. Null when overridden = false. Stamped automatically by the orchestrator (Decision 25)."
               }
             }
           }

@@ -784,3 +784,44 @@ cron logs to know something broke.
   start that week.
 
 ---
+
+## 25. Override audit: timestamp added now, cross-week log deferred
+
+**Chose (now)**: extend the `override` block in `verifier_report.json`
+with an `overridden_at` field — an ISO 8601 timestamp of when the
+reviewer's `--override` CLI invocation was applied. Null when
+`overridden` is false. Stamped automatically by the orchestrator at
+override time. The new field propagates into `status.json` via the
+existing `$ref` from status.schema.json to verifier_report.schema.json,
+so no separate change is needed there.
+
+**Deferred (revisit when needed)**: do NOT build a dedicated cross-week
+overrides log file for the POC. Per-week audit is already captured fully
+in `verifier_report.json` + `status.json`; a cross-week lookup is served
+by `grep -r '"overridden": true' status/` for POC-scale volumes.
+
+**Considered (deferred bucket)**:
+- Append-only `overrides.log` at the project root with one line per
+  override across all reports.
+- A dashboard page or Fleet View section surfacing recent overrides.
+
+**Why the timestamp now**: knowing *when* a decision was made is
+load-bearing for audit / compliance. The marginal cost is tiny — one
+extra field on the schema plus the orchestrator stamping it when
+applying `--override`. The cost of adding it later, after overrides
+have already happened without timestamps, is much higher (a body of
+data missing the field).
+
+**Why defer the cross-week log**: per-week files capture every override
+completely (claim, issue, evidence, override block, rule_id). Cross-week
+aggregation is a query over those files, not new data. Building a
+dedicated log adds maintenance for marginal benefit at POC scale.
+Revisit when:
+- The number of reports makes `grep` over `status/` impractical, OR
+- Compliance / governance asks for a single feed.
+
+**Trigger to revisit**: the operator finding themselves reaching for
+`grep` more than a couple of times a month, or external audit
+requirements landing.
+
+---

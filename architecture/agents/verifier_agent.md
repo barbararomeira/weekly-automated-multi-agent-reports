@@ -48,7 +48,7 @@ Summary of the structure:
 
 - `report_id`, `status` (`pass` / `warn` / `fail`), `checks_run`, `summary` (`hard_count` + `fixable_count`), and an array of `warnings`.
 - Each warning has a stable `id` (e.g. `w1`), `severity` (`hard` or `fixable`), `category`, the `claim` from the narrative, its `location` (JSON-path into `narrative_blocks.json`), the `issue`, the `evidence`, an optional `suggestion`, an optional `rule_id` pointing to a methodology section, and an `override` block.
-- The `override` block contains `overridden: bool` and a `justification` string — populated by the orchestrator's `--override` flag when the reviewer bypasses a hard error.
+- The `override` block contains `overridden: bool`, a `justification` string, and an `overridden_at` ISO 8601 timestamp — populated by the orchestrator's `--override` flag when the reviewer bypasses a hard error (Decisions 17 and 25).
 
 **Status semantics** (reflect the state at the end of the run, *after* the auto-fix loop has run):
 
