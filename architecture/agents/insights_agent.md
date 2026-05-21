@@ -49,6 +49,12 @@ Rules:
 - Every number must include its unit.
 - No comma separators in numerals.
 - Refer to the customer and line by the names in the config; do not invent.
+- Calibrate the strength of claims to data adequacy. Before drawing trend
+  conclusions, read `productive_hours` per week, the total number of weeks
+  available, and which shifts contributed each week. If the data is thin —
+  few weeks, a week with anomalously low `productive_hours` relative to the
+  dataset typical, or a shift absent from recent weeks — describe what's
+  there without anchoring strong claims on noisy signals (Decision 20).
 
 METHODOLOGY DOCUMENT
 {contents of context.md}

@@ -469,3 +469,59 @@ effort) and the risk of verifier nagging (narratives bloating into a wall of
 text covering every minor change) outweigh the benefit.
 
 ---
+
+## 20. Pipeline self-audit scope: bug detection only
+
+**Chose**: step ③ (`DATA-QUALITY CHECK`) only halts the pipeline when the
+data is *broken* in a way the rest of the system cannot recover from.
+Everything interpretive — *"is this week sparse enough to caveat?"*, *"do we
+have enough data for a slope?"*, *"is some shift missing from this week's
+data?"* — moves to the Insights agent, which reasons about adequacy directly
+from the data.
+
+**The audit halts on:**
+- **Pipeline correctness**: cause-bags sum to total bags; weekly aggregates
+  match the sum of daily aggregates; per-shift bags summed across shifts
+  equal the weekly total.
+- **Schema**: all expected columns present in each output CSV.
+- **Corruption**: no NaN in critical columns (`loss_rate`, `productive_hours`,
+  `cycle_count`).
+- **Impossible values**: no negative `loss_rate`, no negative
+  `productive_hours`, no negative `cycle_count`; OLS slope within plausible
+  bounds.
+- **Existence**: every output CSV is non-empty.
+
+**The audit does NOT halt on:**
+- Sparse weeks (low productive hours).
+- Too few weeks to compute a meaningful slope.
+- Latest complete week not yet existing (e.g., brand-new report).
+- Missing shifts in this week's data.
+- Any other question of "is the data enough for this analysis?"
+
+**Considered**:
+- Folding interpretive thresholds into the audit (e.g., halt if fewer than N
+  weeks of data; tag as sparse if productive hours below threshold T).
+- A graded severity scheme on the audit itself (halt / warn / pass-through).
+
+**Why**: the report is built end-to-end on a per-active-hour rate (Decision 1).
+The Insights agent already has access to productive hours per week
+(`weekly_time_on_product.csv`), the row count, and the shift coverage —
+everything needed to judge whether a conclusion is supported by enough data.
+Pre-deciding adequacy with audit thresholds duplicates that signal and makes
+the system brittle: any new edge case would need a new threshold, and
+thresholds chosen at audit-design time may not match how the agent should
+narrate. Letting the agent reason directly from the data keeps both layers
+honest — the audit becomes a small, testable set of deterministic invariants,
+and the agent stays responsible for the qualitative judgement.
+
+This also collapses the originally-imagined "warn / pass-through" tier in
+the audit. The audit is binary: data is broken (halt) or data is fine
+(pass). All interpretation happens downstream.
+
+**Implication for the Insights agent**: the agent's prompt explicitly directs
+it to consider how many weeks of data exist, how many productive hours each
+week contributed, and whether all shifts are represented — and to calibrate
+the strength of claims to what the data supports. The data carries the
+signal; the prompt makes the agent attend to it.
+
+---

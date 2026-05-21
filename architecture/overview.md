@@ -29,8 +29,13 @@ the methodology and the data, and emits:
    ② KPI PIPELINE           [scripts]
         │   outputs/*.csv (weekly + daily aggregates, shift / weekday tables)
         ▼
-   ③ DATA-QUALITY CHECK     [script]
-        │   fail-fast if anything is wrong
+   ③ DATA-QUALITY CHECK     [script — invariant-only, Decision 20]
+        │   bug detection only: aggregate sums (cause-bags = total;
+        │   weekly = sum of daily; per-shift summed = weekly), schema,
+        │   no NaN, no impossible values, non-empty output.
+        │   Halts on broken data. Does NOT pre-judge data adequacy
+        │   (sparse weeks, slope-readiness, missing shifts) —
+        │   that's the Insights agent's job.
         ▼
    ④ INSIGHTS AGENT         [LLM]
         │   outputs/narrative_blocks.json
@@ -92,5 +97,6 @@ index) is deterministic because the rules are deterministic.
 - Where the agents are invoked from (orchestrator script structure, retry policy).
 - Cost / model choice per agent (probably Sonnet for insights, Haiku for verifier,
   but unconfirmed).
-- Pipeline self-audit (step ③ above) — what invariants does it check, where
-  does it live, what does it output? *(Open — E)*
+- ~~Pipeline self-audit (step ③)~~ **Resolved 2026-05-21** — invariant-only
+  bug detection; all interpretive judgement is the Insights agent's job.
+  See DECISIONS.md entry 20.
