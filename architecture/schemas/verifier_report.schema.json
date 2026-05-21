@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title":   "verifier_report",
+  "description": "Output from the Verifier agent: the warnings report consumed by the orchestrator (for halt-or-continue decisions), the Fleet View builder (for the status chip + count), and the HTML splicer (for the inline Reviewer flags section). Schema locked 2026-05-21.",
+  "type":    "object",
+  "required": ["report_id", "status", "checks_run", "summary", "warnings"],
+  "additionalProperties": false,
+  "properties": {
+
+    "report_id": {
+      "type": "string",
+      "description": "Internal handle for the report (not user-facing). Used to link this warnings report to its config and per-report dashboard."
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["pass", "warn", "fail"],
+      "description": "Overall outcome. pass = no warnings. warn = soft warnings only, OR all hard errors have been overridden by the reviewer. fail = at least one un-overridden hard error; dashboard not generated."
+    },
+
+    "checks_run": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Identifiers of the checks the verifier executed (e.g. 'methodology_compliance', 'data_sync')."
+    },
+
+    "summary": {
+      "type": "object",
+      "description": "Counts at the top level for quick at-a-glance reading. Consumed by the Fleet View card to render its display string (e.g. '2 warnings').",
+      "required": ["hard_count", "soft_count"],
+      "additionalProperties": false,
+      "properties": {
+        "hard_count": { "type": "integer", "minimum": 0 },
+        "soft_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "warnings": {
+      "type": "array",
+      "description": "One entry per finding. Empty array means a clean pass.",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "claim", "location", "issue", "evidence", "override"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^w[0-9]+$",
+            "description": "Stable identifier for this warning (e.g. 'w1', 'w2'). Used as the target of the override CLI flag."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["hard", "soft"]
+          },
+          "category": {
+            "type": "string",
+            "enum": ["methodology", "sync", "tone", "other"]
+          },
+          "claim": {
+            "type": "string",
+            "description": "Exact text from the narrative being challenged."
+          },
+          "location": {
+            "type": "string",
+            "description": "JSON-path into narrative_blocks.json identifying where in the narrative the claim lives (e.g. 'main_conclusions.bullets[2].body')."
+          },
+          "issue": {
+            "type": "string",
+            "description": "What the verifier thinks is wrong, in a sentence."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "The CSV value, methodology rule, or other anchor the verifier compared against."
+          },
+          "suggestion": {
+            "type": ["string", "null"],
+            "description": "Optional fix hint."
+          },
+          "rule_id": {
+            "type": ["string", "null"],
+            "description": "Reference to a specific methodology section (e.g. '§6.b'), or null when the warning isn't tied to a documented rule."
+          },
+          "override": {
+            "type": "object",
+            "required": ["overridden", "justification"],
+            "additionalProperties": false,
+            "properties": {
+              "overridden": {
+                "type": "boolean",
+                "description": "True when the reviewer has bypassed this warning via --override."
+              },
+              "justification": {
+                "type": "string",
+                "description": "Reviewer's reason for publishing despite this warning. Must be non-empty when overridden = true; the orchestrator's --override flag enforces this."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

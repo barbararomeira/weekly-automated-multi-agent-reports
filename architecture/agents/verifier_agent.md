@@ -34,32 +34,37 @@ already know is wrong.
 
 ## Output
 
-`outputs/verifier_report.json`. Shape *(TBD — to be schematised separately)*:
+`outputs/verifier_report.json`. Shape locked in
+[`architecture/schemas/verifier_report.schema.json`](../schemas/verifier_report.schema.json).
+Summary of the structure:
 
-```json
-{
-  "status": "pass" | "warn" | "fail",
-  "checks_run":  ["methodology_compliance", "data_sync"],
-  "warnings": [
-    {
-      "severity":   "hard" | "soft",
-      "category":   "methodology" | "sync" | "tone" | "other",
-      "claim":      "<the exact claim from the narrative>",
-      "location":   "<path in narrative_blocks.json>",
-      "issue":      "<what's wrong>",
-      "evidence":   "<the CSV value or methodology rule it conflicts with>",
-      "suggestion": "<optional fix hint>"
-    }
-  ]
-}
+- `report_id`, `status` (`pass` / `warn` / `fail`), `checks_run`, `summary` (counts of hard + soft), and an array of `warnings`.
+- Each warning has a stable `id` (e.g. `w1`), `severity`, `category`, the `claim` from the narrative, its `location` (JSON-path into `narrative_blocks.json`), the `issue`, the `evidence`, an optional `suggestion`, an optional `rule_id` pointing to a methodology section, and an `override` block.
+- The `override` block contains `overridden: bool` and a `justification` string — populated by the orchestrator's `--override` flag when the reviewer bypasses a hard error.
+
+**Status semantics:**
+
+- `pass` — no warnings.
+- `warn` — soft warnings only, OR all hard errors have been overridden by the reviewer (justifications recorded in each `override.justification`).
+- `fail` — at least one un-overridden hard error; pipeline halts; dashboard NOT generated.
+
+## Override workflow
+
+When the verifier emits `status: fail`, the pipeline halts and the Fleet View card surfaces each hard warning inline (claim + issue + evidence + the override command). The reviewer can either fix the root cause and re-run normally, or — if convinced the warning is a false positive — bypass it:
+
+```bash
+python run_weekly.py --override w1 "<short, specific reason — what made this a false positive>"
 ```
 
-- `status: fail` if *any* warning is `severity: hard` → pipeline halts, no
-  dashboard rendered.
-- `status: warn` if at least one soft warning, no hard errors → pipeline
-  continues, warnings carried into `status/<report_id>.json`, surfaced on the
-  fleet view card.
-- `status: pass` if no warnings.
+The justification is mandatory; the command fails without it. On re-run:
+
+1. The verifier re-executes with `w1` flagged as overridden.
+2. `verifier_report.json` records `override: { overridden: true, justification: "..." }` for that warning.
+3. `status` drops from `fail` to `warn` (because the only hard error is now bypassed).
+4. The dashboard renders, with the inline Reviewer flags section at the top showing the overridden warning + the justification — visible to anyone reading the dashboard later.
+5. The Fleet View card flips from 🔴 to 🟡, with the warning count showing 1 overridden.
+
+See [RUNBOOK.md](../../RUNBOOK.md) for the full operational walk-through.
 
 ## Prompt skeleton
 
@@ -138,14 +143,12 @@ explanatory text outside the JSON.
 
 ## Open questions
 
-- Schema for `verifier_report.json` — not yet locked in.
-- "Hard error override" — if the verifier flags a hard error but the human
-  reviewer believes it's a false positive, is there a path to publish anyway?
-  Probably yes (a flag in the rerun), but TBD.
+- ~~Schema for `verifier_report.json`~~ **Resolved 2026-05-21** — see [`architecture/schemas/verifier_report.schema.json`](../schemas/verifier_report.schema.json) and DECISIONS.md entry 16.
+- ~~Hard-error override mechanism~~ **Resolved 2026-05-21** — CLI flag `--override <warning_id> "<justification>"`. See DECISIONS.md entry 17 and RUNBOOK.md scenario 1.
+- How is the methodology document parsed for "MUST" vs "SHOULD" rules? Currently
+  these are not strictly tagged. Worth marking them up explicitly. *(Open — A.3)*
 - Should the verifier also check for *missing* coverage (i.e., the narrative
   failed to mention an important week-over-week change)? More ambitious — might
-  belong to a separate "coverage" agent later.
-- How is the methodology document parsed for "MUST" vs "SHOULD" rules? Currently
-  these are not strictly tagged. Worth marking them up explicitly.
+  belong to a separate "coverage" agent later. *(Open — A.4)*
 - Cost of running both agents weekly — needs an estimate before locking in
-  model choice.
+  model choice. *(Open — E)*
