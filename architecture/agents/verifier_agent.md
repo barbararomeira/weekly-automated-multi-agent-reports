@@ -178,8 +178,6 @@ explanatory text outside the JSON.
 - ~~Schema for `verifier_report.json`~~ **Resolved 2026-05-21** — see [`architecture/schemas/verifier_report.schema.json`](../schemas/verifier_report.schema.json) and DECISIONS.md entry 16.
 - ~~Hard-error override mechanism~~ **Resolved 2026-05-21** — CLI flag `--override <warning_id> "<justification>"`. See DECISIONS.md entry 17 and RUNBOOK.md scenario 1.
 - ~~Hard vs soft vs fixable classification~~ **Resolved 2026-05-21** — auto-fix loop for fixable; immediate halt for hard; soft tier removed. See DECISIONS.md entry 18 and RUNBOOK.md scenario 2.
-- Should the verifier also check for *missing* coverage (i.e., the narrative
-  failed to mention an important week-over-week change)? More ambitious — might
-  belong to a separate "coverage" agent later. *(Open — A.4)*
+- ~~Coverage checks (verifier flags *missing* commentary)~~ **Resolved 2026-05-21** — deferred to post-POC; the narrative's tight structure already functions as a coverage rail. See DECISIONS.md entry 19.
 - Cost of running both agents weekly — needs an estimate before locking in
   model choice. *(Open — E)*

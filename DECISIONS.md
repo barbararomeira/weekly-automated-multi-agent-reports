@@ -439,3 +439,33 @@ See [RUNBOOK.md](./RUNBOOK.md) scenario 2 for what happens when the auto-fix
 loop exhausts.
 
 ---
+
+## 19. Coverage checks deferred to post-POC
+
+**Chose**: the verifier only checks what the narrative *says*, not what it
+*omits*. If the underlying data contains a notable week-over-week change that
+the Insights agent failed to discuss, the verifier will not flag it.
+
+**Considered**:
+- Add an *omission* check to the verifier — give it the CSVs plus an explicit
+  list of "things worth mentioning" rules, then let it flag the narrative when
+  an important data point is missing.
+- Build a separate "coverage" agent dedicated to the question.
+
+**Why defer**: the question is hard for two reasons. First, "important enough
+to mention" is subjective — turning it into a verifier rule means writing
+explicit thresholds into the methodology (e.g., *"any per-shift slope reversal
+of more than 0.2 bags/h/wk must be discussed in the per-shift trend intro"*).
+That's a body of methodology work in itself, and the right thresholds aren't
+obvious upfront. Second, the narrative is already tightly structured
+(Decision 15) — 4-6 conclusion bullets, top 3 actions, drivers insight,
+pattern intros — leaving the agent little room to *miss* a big story. The
+structure functions as a coverage rail by design.
+
+**Trigger to revisit**: if a few weeks of real runs show the Insights agent
+consistently missing notable week-over-week changes, that's the signal to add
+a coverage check. Until then, the cost of writing coverage rules (methodology
+effort) and the risk of verifier nagging (narratives bloating into a wall of
+text covering every minor change) outweigh the benefit.
+
+---
