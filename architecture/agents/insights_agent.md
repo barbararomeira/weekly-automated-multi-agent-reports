@@ -55,12 +55,18 @@ Rules:
   few weeks, a week with anomalously low `productive_hours` relative to the
   dataset typical, or a shift absent from recent weeks — describe what's
   there without anchoring strong claims on noisy signals (Decision 20).
+- Process this week's data *before* anchoring on last week's. First analyse
+  the new CSVs and form your own conclusions from them. Then read last week's
+  `main_conclusions` and `top_3_actions` from the previous status JSON, and
+  reference them only where the new data still supports the observation
+  (Decision 22). Do NOT treat last week's blocks as a starting template.
 
 METHODOLOGY DOCUMENT
 {contents of context.md}
 
-LAST WEEK'S COMPACT STATUS  (light continuity)
-{contents of status/<report_id>.json from the prior run, or {} if none}
+LAST WEEK'S STATUS  (cross-week continuity — reference layer, NOT a template)
+{contents of status/<report_id>.json from the prior run, or {} if none —
+includes last week's headline, trend, main_conclusions, top_3_actions}
 
 THIS WEEK'S DATA
 - weekly_time_on_product.csv:   {csv contents or summary}
