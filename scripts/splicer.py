@@ -191,6 +191,67 @@ def chart_per_shift_trend_html(week_shift_rows: list[dict]) -> str:
 # Render
 # ---------------------------------------------------------------------------
 
+def write_status_json(
+    status_dir: Path,
+    report_meta: dict,
+    week_end: date,
+    dashboard_path: Path,
+    headline_value: float,
+    headline_unit: str,
+    trend_direction: str,
+    trend_slope: float,
+    trend_slope_unit: str,
+    narrative: dict,
+    reviewer_flags: list,
+) -> Path:
+    """Write status/<report_id>.json per status.schema.json (Decision 22).
+
+    The status is derived from the warnings: pass = no warnings; warn = some
+    hard warnings but all overridden; fail = at least one un-overridden hard
+    warning. Phase 2 has no verifier yet, so reviewer_flags is normally
+    empty and status defaults to "pass".
+    """
+    hard    = sum(1 for w in reviewer_flags if w.get("severity") == "hard")
+    fixable = sum(1 for w in reviewer_flags if w.get("severity") == "fixable")
+
+    if not reviewer_flags:
+        status = "pass"
+    elif all(
+        (w.get("severity") != "hard"
+         or (w.get("override") or {}).get("overridden"))
+        for w in reviewer_flags
+    ):
+        status = "warn"
+    else:
+        status = "fail"
+
+    status_obj = {
+        "schema_version":      "1.0",
+        "report_id":           report_meta["report_id"],
+        "customer":            report_meta["customer"],
+        "report_display_name": report_meta["report_display_name"],
+        "week_end":            week_end.isoformat(),
+        "updated_at":          datetime.now().isoformat(timespec="seconds"),
+        "dashboard_path":      str(dashboard_path),
+        "status":              status,
+        "summary":             {"hard_count": hard, "fixable_count": fixable},
+        "warnings":            reviewer_flags,
+        "headline":            {"value": headline_value, "unit": headline_unit},
+        "trend":               {
+            "direction":  trend_direction,
+            "slope":      round(trend_slope, 2),
+            "slope_unit": trend_slope_unit,
+        },
+        "main_conclusions":    narrative["main_conclusions"],
+        "top_3_actions":       narrative["top_3_actions"],
+    }
+
+    status_dir.mkdir(parents=True, exist_ok=True)
+    path = status_dir / f"{report_meta['report_id']}.json"
+    path.write_text(json.dumps(status_obj, indent=2))
+    return path
+
+
 def render_dashboard(
     narrative: dict,
     output_dir: Path,
@@ -270,9 +331,13 @@ def render_dashboard(
     )
 
     expected = {
-        "headline_value": headline_value,
-        "headline_unit":  headline_unit,
+        "headline_value":  headline_value,
+        "headline_unit":   headline_unit,
         "trend_direction": direction,
+        # The status writer needs these too — return them for the caller to use.
+        "slope":           slope,
+        "week_end":        _week_end(latest["week_start"]),
+        "reviewer_flags":  reviewer_flags,
     }
     return html, expected
 
@@ -365,6 +430,10 @@ def main() -> None:
         help="ISO date to treat as 'today' for latest-complete-week selection. "
              "Defaults to today.",
     )
+    parser.add_argument(
+        "--status-dir", default="status/",
+        help="Directory for status/<report_id>.json (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     today = date.fromisoformat(args.as_of) if args.as_of else date.today()
@@ -396,6 +465,27 @@ def main() -> None:
         f"headline {expected['headline_value']} {expected['headline_unit']}, "
         f"trend {expected['trend_direction']}."
     )
+
+    # Write status/<report_id>.json (consumed by build_fleet_view and by next
+    # week's Insights agent for continuity per Decision 22).
+    status_path = write_status_json(
+        status_dir=Path(args.status_dir),
+        report_meta={
+            "report_id":           args.report_id,
+            "report_display_name": args.report_display_name,
+            "customer":            args.customer,
+        },
+        week_end=expected["week_end"],
+        dashboard_path=html_path,
+        headline_value=expected["headline_value"],
+        headline_unit=expected["headline_unit"],
+        trend_direction=expected["trend_direction"],
+        trend_slope=expected["slope"],
+        trend_slope_unit="bags/h/wk",
+        narrative=narrative,
+        reviewer_flags=expected["reviewer_flags"],
+    )
+    print(f"Wrote status to {status_path}")
 
 
 if __name__ == "__main__":
