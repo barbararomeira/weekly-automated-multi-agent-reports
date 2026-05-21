@@ -170,8 +170,11 @@ explanatory text outside the JSON.
 - Run cadence: once per report per Monday, immediately after the Insights agent.
 - Input size: same as Insights agent — under 50 KB total prompt.
 - Output size: small — a list of warnings, typically empty or short.
-- Model choice: TBD. A cheaper, faster model (Haiku-tier) is plausible because
-  the task is structural and constrained.
+- Model choice: **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) — locked
+  in Decision 26. Chosen because the task is structural (matching numbers
+  to CSV cells, checking forbidden phrases, validating unit presence) and
+  Haiku is faster — relevant because the auto-fix loop can re-run the
+  Verifier multiple times per weekly run.
 
 ## Open questions
 

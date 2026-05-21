@@ -825,3 +825,63 @@ Revisit when:
 requirements landing.
 
 ---
+
+## 26. Model choice per agent + rough cost
+
+**Chose**:
+
+- **Insights agent**: Claude Sonnet 4.6 (`claude-sonnet-4-6`).
+- **Verifier agent**: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`).
+
+Both call through the official Anthropic Python SDK with `max_retries=3`
+on transient errors (Decision 24).
+
+**Cost envelope** (rough, not exact pricing):
+
+| Setup | Per weekly run | Per year (52 runs / report) |
+|---|---|---|
+| Insights=Sonnet, Verifier=Haiku *(chosen)* | ~$0.21 | ~$11 |
+| Insights=Sonnet, Verifier=Sonnet | ~$0.30 | ~$15 |
+| Insights=Haiku, Verifier=Haiku | ~$0.07 | ~$4 |
+
+The chosen setup includes the headline call plus an assumed average of
+two auto-fix loop rounds per run. Cost is rounding-error at this scale;
+even at 10× the report volume the system stays well under $200/year.
+
+**Considered**:
+- *Both Haiku*: ~$4/year per report. Rejected because the Insights agent's
+  prose-writing job involves multiple framing constraints (claim-strength
+  calibration → Decision 20; positive-lean ordering → Decision 15; in-prose
+  caveats → Decision 22) where Haiku carries a higher risk of generic or
+  mis-calibrated output. Cents saved isn't worth the quality risk.
+- *Both Sonnet*: ~$15/year per report. Rejected as overkill — the Verifier's
+  task is structural (does this number trace to the CSV; is this framing
+  forbidden by the methodology), squarely in Haiku's wheelhouse.
+- *Opus for either*: rejected — several × the cost without measurable
+  quality gain for this use case.
+
+**Why Sonnet for Insights**:
+- Multi-step reasoning: read methodology + data + prior status, then write
+  balanced prose with specific rules. Sonnet handles instruction-following
+  with many simultaneous constraints better than Haiku.
+- Narrative quality: the output is customer-facing prose; tone, clarity,
+  and ordering all matter.
+- Cost difference is rounding error.
+
+**Why Haiku for Verifier**:
+- Structural task: matching numbers from prose to CSV cells; checking
+  forbidden phrases (period-aggregate comparisons, judgement words);
+  validating unit presence. All in Haiku's strength.
+- Speed: Haiku's lower latency matters because the auto-fix loop can run
+  the Verifier multiple times per weekly run.
+- Cheap upgrade path: if real runs show the Verifier missing real issues,
+  upgrading to Sonnet is a config-only change.
+
+**Trigger to revisit**:
+- Verifier consistently missing real issues (false negatives) → upgrade to
+  Sonnet.
+- Insights producing generic or off-brand prose → likely prompt-side fix
+  first; Opus is the step beyond that if needed.
+- Anthropic releases newer / cheaper variants — re-evaluate.
+
+---

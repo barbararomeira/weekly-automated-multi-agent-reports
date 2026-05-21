@@ -106,8 +106,9 @@ behaviour tuneable without touching code.
   the methodology document (~20 KB) and last week's status (~1 KB). Total prompt
   well under 50 KB.
 - Output size: bounded by the narrative schema (a few KB).
-- Model choice: TBD. Sonnet-tier is the natural starting point for the prose
-  quality; cheaper models worth testing.
+- Model choice: **Claude Sonnet 4.6** (`claude-sonnet-4-6`) — locked in
+  Decision 26. Chosen for instruction-following under multiple simultaneous
+  framing constraints (Decisions 15, 20, 21, 22) and prose quality.
 
 ## Open questions
 
