@@ -10,7 +10,7 @@ The example use case in this repo is a weekly manufacturing performance report, 
 
 ---
 
-## See it in 60 seconds
+## Quickstart
 
 Two pre-generated HTML files live in this repo. They were produced by the system itself, on the included synthetic data. No install, no API key — just click:
 
@@ -26,7 +26,7 @@ pip install -e ".[dev]"
 python run_weekly.py --mock --as-of 2026-05-21
 ```
 
-The `--mock` flag swaps the LLM calls for fixed JSON files in `fixtures/`, so this works with **no API key**. Real-agent mode is one flag away — see [Try it with real agents](#try-it-with-real-agents).
+The `--mock` flag swaps the LLM calls for fixed JSON files in `fixtures/`, so this works with **no API key**. Real-agent mode is one flag away — see [Run it with real agents](#run-it-with-real-agents).
 
 ---
 
@@ -86,7 +86,7 @@ Six highlights — the full *chose / considered / why* for all 27 lives in [DECI
 
 ---
 
-## Try it — mock mode (no API key)
+## Run it locally (mock mode)
 
 **Requirements:** Python 3.11 or newer, Git, a terminal.
 
@@ -112,7 +112,7 @@ After the run, you'll find these files:
 
 ---
 
-## Try it with real agents
+## Run it with real agents
 
 Drop the `--mock` flag and set an Anthropic API key:
 
