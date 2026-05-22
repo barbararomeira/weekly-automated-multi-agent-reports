@@ -1,7 +1,7 @@
 [project]
 name = "weekly-multi-agent-reports"
 version = "0.1.0"
-description = "Customer-agnostic multi-agent weekly manufacturing report generator (portfolio repo)."
+description = "A multi-agent template for scheduled, factually-verified reports: deterministic pipeline + LLM writer + LLM fact-checker."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
