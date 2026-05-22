@@ -46,32 +46,28 @@ The full set of design + methodology trade-offs (27 of them, with *chose / consi
 
 ## Architecture at a glance
 
-```
-  ⏰ Mondays
-       │
-       ▼
-  ①  Extract raw cycle data from the production DB           (Python)
-       │
-  ②  KPI pipeline — loss rate / cause-split / trend           (Python)
-       │
-  ③  Self-audit — invariants, schema, no NaN, no impossibles  (Python, halts on broken data)
-       │
-  ④  Insights agent — narrative_blocks.json                   (Claude Sonnet 4.6)
-       │       ↑
-  ⑤  Verifier agent — checks every claim vs data + methodology (Claude Haiku 4.5)
-       │       │
-  ⑤b ←─ fix loop ─ for "fixable" warnings, re-emit narrative (max 2 retries)
-       │
-  ⑥  Splicer — narrative JSON + KPIs → HTML dashboard         (Python + Jinja2)
-       │       └─ post-render check on headline widget value + trend colour
-       │
-  ⑦  Fleet View — cross-report index, surfaces failures inline  (Python)
-       │
-       ▼
-  weekly_kpi_dashboard.html + status JSON + fleet_view.html
+```mermaid
+flowchart TD
+    Start([Mondays]) --> S1[① Extract raw cycle data<br/><i>Python</i>]
+    S1 --> S2[② KPI pipeline<br/>loss rate / cause-split / trend<br/><i>Python</i>]
+    S2 --> S3[③ Self-audit<br/>invariants / schema / no NaN<br/><i>Python -- halts on broken data</i>]
+    S3 --> S4[④ Insights agent<br/>narrative_blocks.json<br/><i>Claude Sonnet 4.6</i>]
+    S4 --> S5{⑤ Verifier agent<br/>every claim vs data + methodology<br/><i>Claude Haiku 4.5</i>}
+    S5 -- fixable warnings<br/>max 2 retries --> S4
+    S5 -- pass --> S6[⑥ Splicer<br/>narrative + KPIs to HTML<br/><i>Python + Jinja2</i><br/>post-render check on headline + colour]
+    S6 --> S7[⑦ Fleet View<br/>cross-report index<br/><i>Python</i>]
+    S7 --> End([weekly_kpi_dashboard.html<br/>+ status JSON<br/>+ fleet_view.html])
+
+    classDef llm fill:#e1f5ff,stroke:#0969da,color:#000
+    classDef python fill:#f6f8fa,stroke:#656d76,color:#000
+    classDef io fill:#dafbe1,stroke:#1a7f37,color:#000
+
+    class S1,S2,S3,S6,S7 python
+    class S4,S5 llm
+    class Start,End io
 ```
 
-The agent boundary is narrow on purpose. Everything outside steps ④ and ⑤ is deterministic — cheaper, faster, more reviewable.
+**Blue** = LLM steps. **Grey** = deterministic Python. **Green** = the weekly trigger and the final published outputs. The agent boundary is narrow on purpose — everything outside steps ④ and ⑤ is deterministic, which means cheaper, faster, more reviewable.
 
 ---
 
