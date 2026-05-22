@@ -27,3 +27,8 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+# examples/ holds pre-generated sample HTMLs for showcase — explicitly NOT ignored
+# even though outputs/ + *.html are ignored elsewhere in this file.
+!examples/
+!examples/*.html
