@@ -141,13 +141,22 @@ For the operational failure modes ("verifier halted," "auto-fix loop exhausted,"
 
 The repo ships as a working template against synthetic manufacturing data. To point it at your own data, three things change:
 
-**1. Point the pipeline at your CSV.** The pipeline expects one row per atomic unit — a production cycle, a customer transaction, a support ticket, whatever yours is. The expected schema is in [`fixtures/README.md`](./fixtures/README.md). Pass your CSV's path with `--input-path`:
+**1. Point the pipeline at your CSV.** The bundled sample sits at `fixtures/synthetic_cycles.csv` and is what the pipeline reads by default. To use your own data, pass `--input-path`:
 
 ```bash
 python run_weekly.py --input-path /path/to/your_data.csv --as-of 2026-05-21
 ```
 
-The default is the bundled synthetic CSV at `fixtures/synthetic_cycles.csv`. For real or sensitive data, `inputs/` is already in `.gitignore` — create the folder, drop your CSV there, and nothing in it will end up in a commit by accident.
+Your CSV needs these four columns, one row per cycle:
+
+| Column | Type | Notes |
+|---|---|---|
+| `timestamp_start` | datetime | ISO 8601, no timezone (e.g. `2026-05-21T07:14:32`) |
+| `cycle_seconds` | float | Total observed duration of the cycle |
+| `loss_seconds` | float | Excess over your SOP target; `0` when the cycle ran on-target |
+| `loss_cause` | string | Cause label for the loss; empty when there was none. The synthetic fixture uses `machine_wait`, `material`, `operator_absent`, `rework`, `changeover` — yours can use any taxonomy that fits your domain. |
+
+Open `fixtures/synthetic_cycles.csv` to see what a few rows look like.
 
 **2. Edit the methodology.** [`methodology/context.md`](./methodology/context.md) is the rulebook the agents read at runtime — what counts as a "shift," when data is too sparse to draw a trend, what units to use, what framings to avoid. Edit this file to match your domain; the agents pick up the changes on the next run, no code change needed.
 
