@@ -141,7 +141,13 @@ For the operational failure modes ("verifier halted," "auto-fix loop exhausted,"
 
 The repo ships as a working template against synthetic manufacturing data. To point it at your own data, three things change:
 
-**1. Replace the fixture with your CSV.** The pipeline expects one row per atomic unit (a production cycle, a customer transaction, a support ticket — whatever yours is). The expected schema is documented in [`fixtures/README.md`](./fixtures/README.md). Drop your CSV at `inputs/cycles.csv` (path configurable via `--input-path`).
+**1. Point the pipeline at your CSV.** The pipeline expects one row per atomic unit — a production cycle, a customer transaction, a support ticket, whatever yours is. The expected schema is in [`fixtures/README.md`](./fixtures/README.md). Pass your CSV's path with `--input-path`:
+
+```bash
+python run_weekly.py --input-path /path/to/your_data.csv --as-of 2026-05-21
+```
+
+The default is the bundled synthetic CSV at `fixtures/synthetic_cycles.csv`. For real or sensitive data, `inputs/` is already in `.gitignore` — create the folder, drop your CSV there, and nothing in it will end up in a commit by accident.
 
 **2. Edit the methodology.** [`methodology/context.md`](./methodology/context.md) is the rulebook the agents read at runtime — what counts as a "shift," when data is too sparse to draw a trend, what units to use, what framings to avoid. Edit this file to match your domain; the agents pick up the changes on the next run, no code change needed.
 
