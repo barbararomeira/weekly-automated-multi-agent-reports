@@ -7,6 +7,7 @@ Thanks for considering a contribution.
 ```bash
 git clone https://github.com/barbararomeira/weekly-automated-multi-agent-reports
 cd weekly-automated-multi-agent-reports
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
