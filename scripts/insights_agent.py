@@ -251,6 +251,18 @@ def generate(
     output_dir: Path,
     narrative_out: Path,
 ) -> dict[str, Any]:
+    # Preflight: real-mode requires an API key. Fires on every call path
+    # (CLI and orchestrator alike), so callers see a clean message instead of
+    # an SDK auth traceback two steps in.
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print(
+            "ERROR: ANTHROPIC_API_KEY is not set.\n"
+            "Either export the env var to make a real API call, or pass "
+            "--mock to run_weekly.py (or --mock-narrative to insights_agent directly).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     methodology = _read_or_empty(methodology_path)
     schema      = _load_json(schema_path)
     config      = _load_yaml(config_path)
@@ -338,16 +350,6 @@ def main() -> None:
         shutil.copy(src, narrative_out)
         print(f"MOCK MODE: validated and copied {src} → {narrative_out}")
         return
-
-    # Real mode requires an API key
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print(
-            "ERROR: ANTHROPIC_API_KEY is not set.\n"
-            "Either export the env var to make a real API call, or pass "
-            "--mock-narrative fixtures/narrative_blocks.json to use the demo fixture.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
     narrative = generate(
         methodology_path=Path(args.methodology),

@@ -22,6 +22,7 @@ To regenerate them yourself on your machine:
 ```bash
 git clone https://github.com/barbararomeira/weekly-automated-multi-agent-reports
 cd weekly-automated-multi-agent-reports
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 python run_weekly.py --mock --as-of 2026-05-21
 ```
@@ -93,6 +94,7 @@ Six highlights — the full *chose / considered / why* for all 27 lives in [DECI
 ```bash
 git clone https://github.com/barbararomeira/weekly-automated-multi-agent-reports
 cd weekly-automated-multi-agent-reports
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 python run_weekly.py --mock --as-of 2026-05-21
 ```

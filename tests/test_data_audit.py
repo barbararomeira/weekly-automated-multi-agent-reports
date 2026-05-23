@@ -1,7 +1,6 @@
 """Tests for scripts/data_audit.py — verify it catches each bug category."""
 
 import csv
-import shutil
 from pathlib import Path
 
 import pytest
