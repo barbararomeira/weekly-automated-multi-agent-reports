@@ -27,7 +27,7 @@ pip install -e ".[dev]"
 python run_weekly.py --mock --as-of 2026-05-21
 ```
 
-The `--mock` flag swaps the LLM calls for fixed JSON files in `fixtures/`, so this works with **no API key**. Real-agent mode is one flag away — see [Run it with real agents](#run-it-with-real-agents).
+The `--mock` flag swaps the LLM calls for fixed JSON files in `fixtures/`, so this works with no external setup. Every other step (KPI maths, audit, splicing, fleet-view assembly) executes for real, so the system runs end-to-end on your laptop.
 
 ---
 
@@ -39,7 +39,7 @@ If you're building anything where an LLM has to be **factually right** (not just
 
 **2. Verifier agent runs BEFORE rendering.** Most LLM systems generate the output and *then* optionally check it. By that point it's too late: if a wrong number reaches a customer, the trust hit is irreversible. Here, a second agent (cheaper model: Haiku) compares every numeric claim in the narrative against the underlying CSVs **before** any HTML is generated. Bad claims either trigger a re-write loop or halt the run.
 
-**3. Two models, two roles.** The writer is Sonnet (one expensive call per run, ~9k output tokens). The verifier is Haiku (structured JSON comparison — it needs accuracy, not eloquence). Cost-per-run lands around **$0.21** instead of ~$0.40 if you used Sonnet for both, with no accuracy loss on the verifier's task. Asymmetric model choice matters.
+**3. Two models, two roles.** The writer is Sonnet (one call per run, ~9k output tokens — the eloquent part). The verifier is Haiku (structured JSON comparison — it needs accuracy, not eloquence). Asymmetric model choice matters: using the same heavyweight model for both buys no accuracy on the verifier's task.
 
 The full set of design + methodology trade-offs (27 of them, with *chose / considered / why* for each) lives in [DECISIONS.md](./DECISIONS.md).
 
@@ -83,7 +83,7 @@ Six highlights — the full *chose / considered / why* for all 27 lives in [DECI
 | 18 | **Auto-fix loop for fixable warnings; cap at 2 retries.** | Doing N retries silently masks real methodology problems behind a "looks-clean" pass. The cap forces human attention when the loop doesn't converge. |
 | 20 | **Self-audit catches bugs, not judgment calls.** | Broken data halts cheap (before any LLM call). "Sparse week, can't really call a slope" is an interpretation question and belongs to the Insights agent + methodology — conflating them produces bad halts and bad narratives. |
 | 24 | **Single Python orchestrator; no subprocess fan-out.** | Subprocess + filesystem state between steps invites flakiness (race conditions on `outputs/`, lost stderr, partial writes). One process keeps the failure surface obvious. |
-| 26 | **Sonnet for narrative, Haiku for verifier — ~$0.21 per run.** | Asymmetric model choice. The verifier is a JSON-comparison job, not a writing job — paying Sonnet rates there buys no accuracy. |
+| 26 | **Sonnet for narrative, Haiku for verifier.** | Asymmetric model choice. The verifier is a JSON-comparison job, not a writing job — using the same heavyweight model for both buys no accuracy. |
 
 ---
 
@@ -114,18 +114,7 @@ After the run, you'll find these files:
 
 ---
 
-## Run it with real agents
-
-Drop the `--mock` flag and set an Anthropic API key:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python run_weekly.py --as-of 2026-05-21
-```
-
-You can get a key from [console.anthropic.com](https://console.anthropic.com/). A single weekly run currently costs about **$0.21** (one Sonnet narrative call + one Haiku verifier call). Details in [DECISIONS.md §26](./DECISIONS.md).
-
-A few useful flags:
+## Useful flags
 
 ```bash
 # Override a verifier false positive — justification is mandatory and gets recorded in the dashboard footer.
