@@ -185,7 +185,7 @@ def _user_prompt(config: dict, prior_status: dict, csv_texts: dict[str, str]) ->
 
 
 # ---------------------------------------------------------------------------
-# Anthropic call + JSON extraction
+# Claude call + JSON extraction
 # ---------------------------------------------------------------------------
 
 def _extract_json(text: str) -> dict:

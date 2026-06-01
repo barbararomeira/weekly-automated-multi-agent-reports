@@ -189,7 +189,7 @@ def _user_prompt(
 
 
 # ---------------------------------------------------------------------------
-# Anthropic call + JSON extraction
+# Claude call + JSON extraction
 # ---------------------------------------------------------------------------
 
 def _extract_json(text: str) -> dict:
