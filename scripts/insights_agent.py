@@ -1,39 +1,44 @@
 """Insights agent (step ④ of the weekly run).
 
 Reads the methodology document, the report config, the pipeline's output
-CSVs, and last week's status JSON (if any). Calls Claude Sonnet 4.6 via
-the Anthropic SDK and produces a narrative_blocks.json that conforms to
-v1.0 of architecture/schemas/narrative_blocks.schema.json.
+CSVs, and last week's status JSON (if any). Calls Claude Sonnet via the
+`claude` CLI (Claude-subscription OAuth, no API key) and produces a
+narrative_blocks.json that conforms to v1.0 of
+architecture/schemas/narrative_blocks.schema.json.
 
 The agent validates its own output against the schema before writing.
 On a schema violation, it retries once with the error context in the
 prompt; if still invalid, it propagates the validation error.
 
-`--mock-narrative <path>` bypasses the API entirely and just copies the
-given JSON to the output (validated against the schema first). This is
-how the repo demo runs without an ANTHROPIC_API_KEY — the agent code is
-real, the API call is just skipped in mock mode.
+`--mock-narrative <path>` bypasses the model call entirely and just copies
+the given JSON to the output (validated against the schema first). This is
+how the repo demo runs without a Claude login — the agent code is real, the
+model call is just skipped in mock mode.
 
-Model + retries: Decision 26 — claude-sonnet-4-6 with the SDK's built-in
-retry policy (Decision 24).
+Model: Sonnet via the `claude` CLI, with `--fallback-model haiku`. Each call
+is bounded by a per-attempt timeout and retried once, so a no-response stall
+fails fast instead of hanging.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 import yaml
 
-INSIGHTS_MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 4096
-SDK_MAX_RETRIES = 3  # Decision 24 — built-in SDK retry on 429 / 5xx / timeouts
+INSIGHTS_MODEL = "sonnet"   # claude CLI model alias (Claude-subscription OAuth, no API key)
+FALLBACK_MODEL = "haiku"    # passed to `claude --fallback-model` for overload/error
+SUBPROCESS_TIMEOUT_S = 150  # per-attempt hard cap — fail fast instead of hanging the run
+CALL_MAX_ATTEMPTS    = 2    # retry once on a no-response stall
+CALL_RETRY_BACKOFF_S = 10
 
 
 # ---------------------------------------------------------------------------
@@ -207,35 +212,55 @@ def _extract_json(text: str) -> dict:
     return obj
 
 
-def _call_anthropic(system: str, user: str, schema_error: str = "") -> str:
-    """Single API call. SDK handles retries on 429 / 5xx / timeouts."""
-    import anthropic  # lazy import so mock mode works without the SDK
-
-    client = anthropic.Anthropic(max_retries=SDK_MAX_RETRIES)
-
-    messages: list[dict] = [{"role": "user", "content": user}]
+def _call_claude(system: str, user: str, schema_error: str = "") -> str:
+    """One Claude call via the `claude` CLI as a subprocess — OAuth from the
+    operator's Claude subscription, no API key. Bounded by a per-attempt
+    timeout and retried once, so a no-response stall fails fast instead of
+    hanging the run. (--fallback-model does NOT rescue a *silent* hang — there
+    is no error response to trigger the fallback — hence the explicit timeout.)
+    """
     if schema_error:
         # Schema-violation retry: re-ask with the validator's error in context
-        messages.append({"role": "assistant",
-                         "content": "(previous response did not conform to the schema)"})
-        messages.append({
-            "role": "user",
-            "content": (
-                "Your previous response did not validate against the schema. "
-                f"Validator error: {schema_error}\n"
-                "Return a corrected JSON object conforming to the schema, "
-                "with the same content adjusted to fix the violation. "
-                "Do not include any text outside the JSON."
-            ),
-        })
-
-    response = client.messages.create(
-        model=INSIGHTS_MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text
+        user = (
+            user
+            + "\n\n---\n"
+            + "Your previous response did not validate against the schema.\n"
+            + f"Validator error: {schema_error}\n"
+            + "Return a corrected JSON object conforming to the schema, with the "
+            + "same content adjusted to fix the violation. Do not include any text "
+            + "outside the JSON."
+        )
+    cmd = [
+        "claude", "-p", user,
+        "--system-prompt", system,
+        "--model", INSIGHTS_MODEL,
+        "--fallback-model", FALLBACK_MODEL,
+    ]
+    last_err: Exception | None = None
+    for attempt in range(1, CALL_MAX_ATTEMPTS + 1):
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, check=False,
+                timeout=SUBPROCESS_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired as e:
+            last_err = e
+            print(f"  insights: attempt {attempt}/{CALL_MAX_ATTEMPTS} got no response "
+                  f"within {SUBPROCESS_TIMEOUT_S}s", flush=True)
+        else:
+            if r.returncode == 0:
+                return r.stdout
+            last_err = RuntimeError(f"claude CLI exit {r.returncode}: {r.stderr[:500]}")
+            print(f"  insights: attempt {attempt}/{CALL_MAX_ATTEMPTS} failed "
+                  f"(exit {r.returncode})", flush=True)
+        if attempt < CALL_MAX_ATTEMPTS:
+            time.sleep(CALL_RETRY_BACKOFF_S)
+    raise RuntimeError(
+        f"claude CLI returned nothing after {CALL_MAX_ATTEMPTS} attempts "
+        f"({SUBPROCESS_TIMEOUT_S}s each, model={INSIGHTS_MODEL}/{FALLBACK_MODEL}). "
+        f"Ensure the `claude` CLI is signed in and no other heavy Claude session is "
+        f"running, then retry (or use --mock)."
+    ) from last_err
 
 
 # ---------------------------------------------------------------------------
@@ -251,13 +276,13 @@ def generate(
     output_dir: Path,
     narrative_out: Path,
 ) -> dict[str, Any]:
-    # Preflight: real-mode requires an API key. Fires on every call path
-    # (CLI and orchestrator alike), so callers see a clean message instead of
-    # an SDK auth traceback two steps in.
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    # Preflight: real-mode needs the `claude` CLI on PATH (signed in to a Claude
+    # subscription). Fires on every call path (CLI and orchestrator alike), so
+    # callers see a clean message instead of a FileNotFoundError two steps in.
+    if shutil.which("claude") is None:
         print(
-            "ERROR: ANTHROPIC_API_KEY is not set.\n"
-            "Either export the env var to make a real API call, or pass "
+            "ERROR: the `claude` CLI is not on PATH.\n"
+            "Install Claude Code and sign in to your Claude subscription, or pass "
             "--mock to run_weekly.py (or --mock-narrative to insights_agent directly).",
             file=sys.stderr,
         )
@@ -273,13 +298,13 @@ def generate(
     user   = _user_prompt(config, prior, csv_texts)
 
     # First call
-    raw = _call_anthropic(system, user)
+    raw = _call_claude(system, user)
     try:
         narrative = _extract_json(raw)
         jsonschema.validate(narrative, schema)
     except (json.JSONDecodeError, jsonschema.ValidationError) as e:
         print(f"  insights: first response failed validation ({e}); retrying with error context")
-        raw = _call_anthropic(system, user, schema_error=str(e))
+        raw = _call_claude(system, user, schema_error=str(e))
         narrative = _extract_json(raw)
         jsonschema.validate(narrative, schema)  # if this still fails, propagate
 
@@ -324,9 +349,9 @@ def main() -> None:
     parser.add_argument(
         "--mock-narrative", default=None,
         help="If provided, copy this JSON to --narrative-out (after schema validation) "
-             "and skip the API call entirely. Lets the repo demo run without an "
-             "ANTHROPIC_API_KEY. The agent code is the same in both modes; only the "
-             "API call is bypassed.",
+             "and skip the model call entirely. Lets the repo demo run without a Claude "
+             "login. The agent code is the same in both modes; only the model call is "
+             "bypassed.",
     )
     args = parser.parse_args()
 

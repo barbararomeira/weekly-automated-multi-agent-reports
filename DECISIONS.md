@@ -944,3 +944,37 @@ instances.
 customer-agnostic example configs are tracked.
 
 ---
+
+## 28. LLM transport: `claude -p` CLI (subscription OAuth) instead of the Anthropic API SDK
+
+**Decision.** `insights_agent.py` and `verifier.py` now call Claude through
+the `claude` CLI as a subprocess (`claude -p <user> --system-prompt <system>
+--model sonnet [--fallback-model haiku]`), authenticated by OAuth from a Claude
+subscription — **no `ANTHROPIC_API_KEY`**. This supersedes the Anthropic Python
+SDK transport described in **Decisions 24 and 26** (kept above as history; the
+per-agent model choices in 26 still hold, now expressed as CLI aliases
+`sonnet` / `haiku`).
+
+**Why.**
+- Hard project constraint: no paid Anthropic API and no API key — all Claude
+  calls go through the operator's subscription. The SDK path required a key
+  and so could never run in real mode under that constraint.
+- Keeps the public portfolio and the laptop production instance on the **same
+  transport**, so behaviour and fixes carry across.
+
+**Robustness (learned the hard way).** Each call has a **150s per-attempt
+timeout + one retry** and raises an explicit error on exhaustion. Two findings
+drove this:
+- A no-response "hang" is usually **Max premium-quota exhaustion** (Sonnet and
+  Opus share the pool; Haiku is separate). The CLI silently waits on
+  `retry-after`, which looks like a hang — so a heavy concurrent Claude Code
+  session can starve a production call.
+- `--fallback-model` does **not** rescue a *silent* hang: there is no error
+  response to trigger the fallback. Hence the explicit timeout rather than
+  relying on the fallback alone.
+
+**Unchanged.** `--mock` / `--mock-narrative` / `--mock-verifier-report` still
+bypass the model call with fixtures. The real-mode preflight now checks for the
+`claude` CLI on `PATH` instead of for `ANTHROPIC_API_KEY`.
+
+---

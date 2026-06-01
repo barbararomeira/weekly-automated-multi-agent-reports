@@ -14,7 +14,7 @@ CLI:
   --as-of <YYYY-MM-DD>                     treat that date as "today" (RUNBOOK 6)
   --override <warning_id> <justification>  bypass a hard warning (Decision 17)
   --mock                                   use fixture files for both agents
-                                           (no ANTHROPIC_API_KEY needed)
+                                           (no Claude login needed)
 
 Failure handling (Decision 24): any halting step writes a `status: fail`
 JSON with a synthetic warning so the Fleet View card surfaces the cause
@@ -388,7 +388,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--mock", action="store_true",
-        help="Use fixture files for both LLM agents — no ANTHROPIC_API_KEY required. "
+        help="Use fixture files for both LLM agents — no Claude login required. "
              "The deterministic steps still run for real.",
     )
     parser.add_argument(

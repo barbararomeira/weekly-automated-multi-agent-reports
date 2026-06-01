@@ -1,7 +1,8 @@
 """Verifier agent (step ⑤ of the weekly run).
 
 Reads the just-generated narrative_blocks.json plus the methodology and the
-pipeline's CSVs. Calls Claude Haiku 4.5 (Decision 26) to check that:
+pipeline's CSVs. Calls Claude Haiku via the `claude` CLI (Claude-subscription
+OAuth, no API key) to check that:
 
   1. Every rule in the methodology document is respected — units mandatory,
      no comma separators, slope-only framing, no period-aggregates, no
@@ -14,9 +15,9 @@ architecture/schemas/verifier_report.schema.json. Validates the response
 against the schema and retries once with the validator's error in context
 if the first response is malformed.
 
-`--mock-verifier-report <path>` bypasses the API entirely (validates the
-supplied JSON against the schema and copies it through). Lets the repo
-demo run without an ANTHROPIC_API_KEY.
+`--mock-verifier-report <path>` bypasses the model call entirely (validates
+the supplied JSON against the schema and copies it through). Lets the repo
+demo run without a Claude login.
 
 Severity model (Decision 18):
 - HARD warnings — a claim or number that doesn't trace to the data
@@ -32,17 +33,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 
-VERIFIER_MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 4096
-SDK_MAX_RETRIES = 3  # Decision 24
+VERIFIER_MODEL = "haiku"     # claude CLI model alias (Claude-subscription OAuth, no API key)
+SUBPROCESS_TIMEOUT_S = 150   # per-attempt hard cap — fail fast instead of hanging the run
+CALL_MAX_ATTEMPTS    = 2     # retry once on a no-response stall
+CALL_RETRY_BACKOFF_S = 10
 
 PIPELINE_CSVS = [
     "weekly_production_opportunity.csv",
@@ -209,35 +212,46 @@ def _extract_json(text: str) -> dict:
     return obj
 
 
-def _call_anthropic(system: str, user: str, schema_error: str = "") -> str:
-    """Single API call. SDK handles retries on 429 / 5xx / timeouts (Decision 24)."""
-    import anthropic  # lazy import so mock mode works without the SDK
-
-    client = anthropic.Anthropic(max_retries=SDK_MAX_RETRIES)
-
-    messages: list[dict] = [{"role": "user", "content": user}]
+def _call_claude(system: str, user: str, schema_error: str = "") -> str:
+    """One Claude call via the `claude` CLI as a subprocess — OAuth from the
+    operator's Claude subscription, no API key. Bounded by a per-attempt
+    timeout and retried once, so a no-response stall fails fast instead of
+    hanging the run.
+    """
     if schema_error:
-        messages.append({
-            "role": "assistant",
-            "content": "(previous response did not conform to the schema)",
-        })
-        messages.append({
-            "role": "user",
-            "content": (
-                "Your previous response did not validate against the schema. "
-                f"Validator error: {schema_error}\n"
-                "Return a corrected JSON object conforming to the schema. "
-                "Do not include any text outside the JSON."
-            ),
-        })
-
-    response = client.messages.create(
-        model=VERIFIER_MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text
+        user = (
+            user
+            + "\n\n---\n"
+            + "Your previous response did not validate against the schema.\n"
+            + f"Validator error: {schema_error}\n"
+            + "Return a corrected JSON object conforming to the schema. "
+            + "Do not include any text outside the JSON."
+        )
+    cmd = ["claude", "-p", user, "--system-prompt", system, "--model", VERIFIER_MODEL]
+    last_err: Exception | None = None
+    for attempt in range(1, CALL_MAX_ATTEMPTS + 1):
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, check=False,
+                timeout=SUBPROCESS_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired as e:
+            last_err = e
+            print(f"  verifier: attempt {attempt}/{CALL_MAX_ATTEMPTS} got no response "
+                  f"within {SUBPROCESS_TIMEOUT_S}s", flush=True)
+        else:
+            if r.returncode == 0:
+                return r.stdout
+            last_err = RuntimeError(f"claude CLI exit {r.returncode}: {r.stderr[:500]}")
+            print(f"  verifier: attempt {attempt}/{CALL_MAX_ATTEMPTS} failed "
+                  f"(exit {r.returncode})", flush=True)
+        if attempt < CALL_MAX_ATTEMPTS:
+            time.sleep(CALL_RETRY_BACKOFF_S)
+    raise RuntimeError(
+        f"claude CLI returned nothing after {CALL_MAX_ATTEMPTS} attempts "
+        f"({SUBPROCESS_TIMEOUT_S}s each, model={VERIFIER_MODEL}). Ensure the `claude` CLI "
+        f"is signed in and no other heavy Claude session is running, then retry (or use --mock)."
+    ) from last_err
 
 
 # ---------------------------------------------------------------------------
@@ -261,13 +275,13 @@ def verify(
     system = _system_prompt(methodology, schema)
     user   = _user_prompt(narrative, csv_texts, report_id)
 
-    raw = _call_anthropic(system, user)
+    raw = _call_claude(system, user)
     try:
         report = _extract_json(raw)
         jsonschema.validate(report, schema)
     except (json.JSONDecodeError, jsonschema.ValidationError) as e:
         print(f"  verifier: first response failed validation ({e}); retrying with error context")
-        raw = _call_anthropic(system, user, schema_error=str(e))
+        raw = _call_claude(system, user, schema_error=str(e))
         report = _extract_json(raw)
         jsonschema.validate(report, schema)
 
@@ -311,8 +325,7 @@ def main() -> None:
     parser.add_argument(
         "--mock-verifier-report", default=None,
         help="If provided, copy this JSON to --report-out (after schema validation) "
-             "and skip the API call. Lets the repo demo run without an "
-             "ANTHROPIC_API_KEY.",
+             "and skip the model call. Lets the repo demo run without a Claude login.",
     )
     args = parser.parse_args()
 
@@ -337,10 +350,11 @@ def main() -> None:
         print(f"MOCK MODE: validated and copied {src} → {report_out}")
         return
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if shutil.which("claude") is None:
         print(
-            "ERROR: ANTHROPIC_API_KEY is not set.\n"
-            "Either export the env var or pass --mock-verifier-report fixtures/verifier_report.json.",
+            "ERROR: the `claude` CLI is not on PATH.\n"
+            "Install Claude Code and sign in to your Claude subscription, or pass "
+            "--mock-verifier-report fixtures/verifier_report.json.",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -101,7 +101,7 @@ python run_weekly.py --override w3 "<short, specific reason — what made this a
 |---|---|---|
 | Source CSVs missing or empty | `inputs/` — is the latest month's data there? | Re-run the extractor, or check the upstream data source. |
 | KPI script crashed | Terminal output from the failed run | Read the traceback; usually a column-name or NaN issue. |
-| Insights agent API error / timeout | Terminal output | Wait a minute, re-run. Persistent failures = API key / rate limit. |
+| Insights/verifier agent timed out | Terminal output | The call caps at 150s and retries once. Persistent stalls usually mean Max premium-quota exhaustion (shared Sonnet/Opus pool) — make sure no other heavy Claude session is running, then re-run. |
 | The audit script said new dates need excluding | `python audit_exclusions.py` | Edit `data_exclusions.py`, add the dates, re-run. |
 
 **Action.** Address the underlying cause, then re-run:

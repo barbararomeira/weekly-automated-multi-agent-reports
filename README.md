@@ -12,7 +12,7 @@ The example use case in this repo is a weekly manufacturing performance report, 
 
 ## Quickstart
 
-Two pre-generated HTML files live in this repo. They were produced by the system itself, on the included synthetic data. No install, no API key — just click:
+Two pre-generated HTML files live in this repo. They were produced by the system itself, on the included synthetic data. No install, no setup — just click:
 
 - [`examples/sample_dashboard.html`](./examples/sample_dashboard.html) — the customer-facing weekly report (4 Plotly charts + the LLM-written narrative panel)
 - [`examples/sample_fleet_view.html`](./examples/sample_fleet_view.html) — the cross-report index across multiple lines / customers

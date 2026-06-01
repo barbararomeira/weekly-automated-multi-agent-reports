@@ -9,7 +9,7 @@ python run_weekly.py --mock --as-of 2026-05-21
 
 against the synthetic data fixture (`fixtures/synthetic_cycles.csv`). `--mock`
 swaps in fixed agent outputs so this runs identically on any machine with no
-API key required.
+Claude login required.
 
 ## What's here
 
